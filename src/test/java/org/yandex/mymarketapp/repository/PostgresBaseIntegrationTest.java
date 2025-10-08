@@ -2,6 +2,7 @@ package org.yandex.mymarketapp.repository;
 
 
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -10,6 +11,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @DataJpaTest
 @Testcontainers
+@DirtiesContext
 public abstract class PostgresBaseIntegrationTest {
 
     @Container
