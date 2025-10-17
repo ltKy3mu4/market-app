@@ -2,14 +2,22 @@ spring:
   application:
     name: my-market-app
 
+#  r2dbc:
+#    url: r2dbc:postgresql://127.0.0.1:5432/p2
+#    username: postgres
+#    password: Assassin1993
+#  liquibase:
+#    url: jdbc:postgresql://127.0.0.1:5432/p2
+#    user: postgres
+#    password: Assassin1993
   r2dbc:
-    url: r2dbc:postgresql://127.0.0.1:5432/p2
-    username: postgres
-    password: Assassin1993
+    url: ${R2DBC_DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
   liquibase:
-    url: jdbc:postgresql://127.0.0.1:5432/p2
-    user: postgres
-    password: Assassin1993
+    url: ${JDBC_DATABASE_URL}
+    user: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
 
   #    url: ${DATABASE_URL}
 #    username: ${DATABASE_USERNAME}
