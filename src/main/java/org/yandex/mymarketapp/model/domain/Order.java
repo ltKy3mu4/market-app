@@ -1,24 +1,25 @@
 package org.yandex.mymarketapp.model.domain;
 
-import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.ReadOnlyProperty;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.List;
 
 @Getter
 @Setter
 @Table(name = "orders")
-@Entity
 public class Order {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, name = "total_sum")
+    @Column
     @Min(value = 0)
     private double totalSum;
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "order")
-    private List<OrderPosition> items;
 
+    @ReadOnlyProperty
+    private List<OrderPosition> items;
 }
