@@ -65,7 +65,7 @@ class ItemControllerTest {
     void updateItemQuantity_WithPlusAction_ShouldIncreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -77,7 +77,7 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(itemService);
     }
 
@@ -85,7 +85,7 @@ class ItemControllerTest {
     void updateItemQuantity_WithMinusAction_ShouldDecreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.decreaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.decreaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -97,7 +97,7 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).decreaseQuantityInCart(itemId);
+        verify(cartService).decreaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(itemService);
     }
 
@@ -174,7 +174,7 @@ class ItemControllerTest {
     void updateItemQuantity_WithPlusActionWhenServiceFails_ShouldPropagateError() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId))
+        when(cartService.increaseQuantityInCart(itemId, 0L))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         // When & Then
@@ -186,7 +186,7 @@ class ItemControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(itemService);
     }
 
@@ -223,7 +223,7 @@ class ItemControllerTest {
     void updateItemQuantity_WithFormData_ShouldWorkCorrectly() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         // When & Then - Using form data instead of query param
         webTestClient.post()
@@ -234,7 +234,7 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(itemService);
     }
 

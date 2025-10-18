@@ -41,7 +41,7 @@ public class ItemsController {
     }
 
     @PostMapping("/items")
-    public Mono<String> handleItemAction(@ModelAttribute MainFormData data) {
+    public Mono<String> handleItemAction(@ModelAttribute MainFormData data, @RequestParam(defaultValue = "0") Long userId) {
         if (data == null || data.action() == null || data.id() == null) {
             return Mono.just(UriComponentsBuilder.fromPath("redirect:/")
                     .queryParam("search", data== null || data.search == null ? "" : data.search)
@@ -55,8 +55,8 @@ public class ItemsController {
 
 
         Mono<Void> operation = switch (data.action) {
-            case "PLUS" -> cartService.increaseQuantityInCart(data.id);
-            case "MINUS" -> cartService.decreaseQuantityInCart(data.id);
+            case "PLUS" -> cartService.increaseQuantityInCart(data.id, userId);
+            case "MINUS" -> cartService.decreaseQuantityInCart(data.id, userId);
             default -> Mono.empty();
         };
         return operation.then(Mono.fromCallable(() ->

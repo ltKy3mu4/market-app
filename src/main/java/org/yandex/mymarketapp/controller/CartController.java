@@ -18,8 +18,8 @@ public class CartController {
     private final OrderService orderService;
 
     @GetMapping("/items")
-    public Mono<String> showCart(Model model) {
-        return cartService.getCartItems()
+    public Mono<String> showCart(Model model, @RequestParam(defaultValue = "0") Long userId) {
+        return cartService.getCartItems(userId)
                 .collectList()
                 .doOnNext(items -> {
                     model.addAttribute("items", items);
@@ -29,7 +29,7 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCartItem(@ModelAttribute CartBuyForm form) {
+    public Mono<String> updateCartItem(@ModelAttribute CartBuyForm form, @RequestParam(defaultValue = "0") Long userId) {
 
         if (form == null || form.action() == null || form.id() == null) {
             return Mono.just(UriComponentsBuilder.fromPath("redirect:/cart/items")
@@ -39,9 +39,9 @@ public class CartController {
 
 
         Mono<Void> operation = switch (form.action()) {
-            case "PLUS" -> cartService.increaseQuantityInCart(form.id);
-            case "MINUS" -> cartService.decreaseQuantityInCart(form.id);
-            case "DELETE" -> cartService.removeFromCart(form.id);
+            case "PLUS" -> cartService.increaseQuantityInCart(form.id, userId);
+            case "MINUS" -> cartService.decreaseQuantityInCart(form.id, userId);
+            case "DELETE" -> cartService.removeFromCart(form.id, userId);
             default -> Mono.empty();
         };
 
@@ -49,8 +49,8 @@ public class CartController {
     }
 
     @PostMapping("/buy")
-    public Mono<String> buyItems() {
-        return orderService.makeOrder().thenReturn("redirect:/orders");
+    public Mono<String> buyItems(@RequestParam(defaultValue = "0") Long userId) {
+        return orderService.makeOrder(userId).thenReturn("redirect:/orders");
     }
 
     public record CartBuyForm(Long id, String action){};

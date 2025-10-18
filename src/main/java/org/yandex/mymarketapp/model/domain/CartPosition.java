@@ -23,8 +23,12 @@ public class CartPosition {
     @Min(value = 0, message = "Count position cannot be 0 or less")
     private int count;
 
-    public CartPosition(Long itemId) {
+    @Column("user_id")
+    private Long userId;
+
+    public CartPosition(Long itemId, Long userId) {
         this.itemId = itemId;
+        this.userId = userId;
         this.count = 1;
     }
 }

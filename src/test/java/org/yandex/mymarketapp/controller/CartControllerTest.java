@@ -1,5 +1,6 @@
 package org.yandex.mymarketapp.controller;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
@@ -22,7 +23,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @WebFluxTest(CartController.class)
-@Import(CartController.class) // Ensure the controller is properly imported
+@Import(CartController.class)
 class CartControllerTest {
 
     @Autowired
@@ -41,7 +42,7 @@ class CartControllerTest {
                 new ItemDto(2L, "Item 2", "Description 2", "/img2.jpg", 15.0, 1)
         );
 
-        when(cartService.getCartItems()).thenReturn(Flux.fromIterable(mockCartItems));
+        when(cartService.getCartItems(any())).thenReturn(Flux.fromIterable(mockCartItems));
 
         webTestClient.get()
                 .uri("/cart/items")
@@ -50,32 +51,29 @@ class CartControllerTest {
                 .expectBody()
                 .consumeWith(result -> {
                     String body = new String(result.getResponseBody());
-                    System.out.println();
-                    // For Thymeleaf templates, you might want to check specific content
-                    // Since it's returning a view name, we expect "cart" to be in the response
-                    // You might need to adjust this based on your actual template rendering
+                    Assertions.assertNotNull(body);
                 });
 
-        verify(cartService).getCartItems();
+        verify(cartService).getCartItems(any());
     }
 
     @Test
     void showCart_WhenCartIsEmpty_ShouldReturnCartViewWithZeroTotal() {
-        when(cartService.getCartItems()).thenReturn(Flux.empty());
+        when(cartService.getCartItems(any())).thenReturn(Flux.empty());
 
         webTestClient.get()
                 .uri("/cart/items")
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(cartService).getCartItems();
+        verify(cartService).getCartItems(any());
     }
 
     @Test
     void updateCartItem_WithPlusAction_ShouldIncreaseQuantity() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -85,7 +83,7 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(orderService);
     }
 
@@ -93,7 +91,7 @@ class CartControllerTest {
     void updateCartItem_WithMinusAction_ShouldDecreaseQuantity() {
         Long itemId = 1L;
 
-        when(cartService.decreaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.decreaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -103,7 +101,7 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).decreaseQuantityInCart(itemId);
+        verify(cartService).decreaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(orderService);
     }
 
@@ -111,7 +109,7 @@ class CartControllerTest {
     void updateCartItem_WithDeleteAction_ShouldRemoveItem() {
         Long itemId = 1L;
 
-        when(cartService.removeFromCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.removeFromCart(itemId, 0L)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -121,7 +119,7 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).removeFromCart(itemId);
+        verify(cartService).removeFromCart(itemId, 0L);
         verifyNoInteractions(orderService);
     }
 
@@ -144,7 +142,7 @@ class CartControllerTest {
     void updateCartItem_WithFormData_ShouldWorkCorrectly() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
 
         // Alternative approach using form data instead of bodyValue
         webTestClient.post()
@@ -155,12 +153,12 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
     }
 
     @Test
     void buyItems_ShouldCreateOrder() {
-        when(orderService.makeOrder()).thenReturn(Mono.empty());
+        when(orderService.makeOrder(0L)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/buy")
@@ -168,7 +166,7 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/orders");
 
-        verify(orderService).makeOrder();
+        verify(orderService).makeOrder(0L);
         verifyNoInteractions(cartService); // Note: Your reactive controller doesn't call cartService in buyItems
     }
 
@@ -190,7 +188,7 @@ class CartControllerTest {
     void updateCartItem_WhenServiceReturnsError_ShouldHandleGracefully() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId))
+        when(cartService.increaseQuantityInCart(itemId, 0L))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         webTestClient.post()
@@ -200,6 +198,6 @@ class CartControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(cartService).increaseQuantityInCart(itemId);
+        verify(cartService).increaseQuantityInCart(itemId, 0L);
     }
 }

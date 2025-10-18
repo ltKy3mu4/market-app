@@ -4,7 +4,6 @@ package org.yandex.mymarketapp.repository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.jdbc.Sql;
 import org.yandex.mymarketapp.model.domain.Order;
 import org.yandex.mymarketapp.model.domain.OrderPosition;
 import org.yandex.mymarketapp.repo.OrderRepository;
@@ -14,7 +13,6 @@ import reactor.test.StepVerifier;
 
 import java.util.*;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 
@@ -28,10 +26,12 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
         this.executeSqlScript("sql/init-orders.sql");
     }
 
+    Long userId = 0L;
+
 
     @Test
     void getAllWithPositions_ShouldReturnOrdersWithItems() {
-        Flux<Order> ordersFlux = orderRepository.getAllWithPositions();
+        Flux<Order> ordersFlux = orderRepository.getAllWithPositions(userId);
 
         StepVerifier.create(ordersFlux.collectList())
                 .assertNext(orders -> {
@@ -56,8 +56,8 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
     }
 
     @Test
-    void getByIdWithPositions_WhenOrderExists_ShouldReturnOrderWithItems() {
-        Mono<Order> orderMono = orderRepository.getByIdWithPositions(1L);
+    void getByIdAndUserIdWithPositions_WhenOrderExists_ShouldReturnOrderWithItems() {
+        Mono<Order> orderMono = orderRepository.getByIdAndUserIdWithPositions(1L, userId);
 
         StepVerifier.create(orderMono)
                 .assertNext(order -> {
@@ -75,8 +75,8 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
     }
 
     @Test
-    void getByIdWithPositions_WhenOrderDoesNotExist_ShouldReturnEmpty() {
-        Mono<Order> orderMono = orderRepository.getByIdWithPositions(999L);
+    void getByIdAndUserIdWithPositions_WhenOrderDoesNotExist_ShouldReturnEmpty() {
+        Mono<Order> orderMono = orderRepository.getByIdAndUserIdWithPositions(999L, userId);
 
         StepVerifier.create(orderMono)
                 .verifyComplete();
@@ -114,7 +114,7 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void getAllWithPositions_WhenMultipleOrdersExist_ShouldReturnAllOrders() {
-        Flux<Order> ordersFlux = orderRepository.getAllWithPositions();
+        Flux<Order> ordersFlux = orderRepository.getAllWithPositions(userId);
 
         StepVerifier.create(ordersFlux.collectList())
                 .assertNext(orders -> {
@@ -133,8 +133,8 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
     }
 
     @Test
-    void getByIdWithPositions_ShouldNotCauseLazyLoadingException() {
-        Mono<Order> orderMono = orderRepository.getByIdWithPositions(1L);
+    void getByIdAndUserIdWithPositions_ShouldNotCauseLazyLoadingException() {
+        Mono<Order> orderMono = orderRepository.getByIdAndUserIdWithPositions(1L, userId);
 
         StepVerifier.create(orderMono)
                 .assertNext(order -> {
@@ -146,13 +146,13 @@ class OrderRepositoryTest extends PostgresBaseIntegrationTest {
     }
 
     @Test
-    void getByIdWithPositions_WhenOrderHasNoItems_ShouldReturnOrderWithEmptyItems() {
+    void getByIdAndUserIdWithPositions_WhenOrderHasNoItems_ShouldReturnOrderWithEmptyItems() {
         Order orderWithoutItems = new Order();
         orderWithoutItems.setTotalSum(0.0);
         orderWithoutItems.setItems(new ArrayList<>());
 
         Mono<Order> savedOrderMono = orderRepository.save(orderWithoutItems)
-                .flatMap(savedOrder -> orderRepository.getByIdWithPositions(savedOrder.getId()));
+                .flatMap(savedOrder -> orderRepository.getByIdAndUserIdWithPositions(savedOrder.getId(), userId));
 
         StepVerifier.create(savedOrderMono)
                 .assertNext(foundOrder -> {

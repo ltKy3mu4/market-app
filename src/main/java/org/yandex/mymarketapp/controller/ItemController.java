@@ -32,14 +32,14 @@ public class ItemController {
 
 
     @PostMapping("/{id}")
-    public Mono<String> updateItemQuantity(@PathVariable Long id, @ModelAttribute ActionForm form) {
+    public Mono<String> updateItemQuantity(@PathVariable Long id, @ModelAttribute ActionForm form, @RequestParam(defaultValue = "0") Long userId) {
         if (form == null || form.action() == null) {
             return Mono.just("redirect:/items/" + id);
         }
 
         Mono<Void> operation = switch (form.action()) {
-            case "PLUS" -> cartService.increaseQuantityInCart(id);
-            case "MINUS" -> cartService.decreaseQuantityInCart(id);
+            case "PLUS" -> cartService.increaseQuantityInCart(id, userId);
+            case "MINUS" -> cartService.decreaseQuantityInCart(id, userId);
             default -> Mono.empty();
         };
 

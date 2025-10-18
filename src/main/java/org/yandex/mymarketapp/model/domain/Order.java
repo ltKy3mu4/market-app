@@ -20,6 +20,9 @@ public class Order {
     @Min(value = 0)
     private double totalSum;
 
+    @Column
+    private Long userId;
+
     @ReadOnlyProperty
     private List<OrderPosition> items;
 }

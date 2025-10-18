@@ -92,20 +92,14 @@ class ItemServiceTest {
         when(itemRepo.findItemsWithCount(searchTerm, sortBy, pageSize, 0))
                 .thenReturn(Flux.fromIterable(mockItems));
 
-        // When
         Mono<List<List<ItemDto>>> result = itemService.searchItems(searchTerm, sortBy, pageNumber, pageSize);
 
-        // Then
         StepVerifier.create(result)
                 .assertNext(groupedItems -> {
                     assertNotNull(groupedItems);
                     assertEquals(3, groupedItems.size()); // 7 items should be grouped into 3 rows
-
-                    // First row should have 3 items
                     assertEquals(3, groupedItems.get(0).size());
-                    // Second row should have 3 items
                     assertEquals(3, groupedItems.get(1).size());
-                    // Third row should have 1 item
                     assertEquals(1, groupedItems.get(2).size());
                 })
                 .verifyComplete();

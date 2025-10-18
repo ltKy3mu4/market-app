@@ -35,6 +35,8 @@ class OrderServiceTest {
 
     @Autowired
     private OrderService orderService;
+    
+    private Long userId = 0L;
 
     @Test
     void makeOrder_WithMultipleItems_ShouldCreateOrderWithCorrectTotal() {
@@ -49,20 +51,20 @@ class OrderServiceTest {
         savedOrder.setId(1L);
         savedOrder.setTotalSum(70.0); // (10*2) + (15*3) + (5*1) = 20 + 45 + 5 = 70
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
-        when(cartRepo.clearCart()).thenReturn(Mono.just(1));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).getAllCartPositions();
+        verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(any(Order.class));
-        verify(cartRepo).clearCart();
+        verify(cartRepo).clearCart(userId);
     }
 
     @Test
@@ -76,64 +78,64 @@ class OrderServiceTest {
         savedOrder.setId(1L);
         savedOrder.setTotalSum(25.0);
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
-        when(cartRepo.clearCart()).thenReturn(Mono.just(1));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).getAllCartPositions();
+        verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(argThat(order ->
                 order.getTotalSum() == 25.0
         ));
-        verify(cartRepo).clearCart();
+        verify(cartRepo).clearCart(userId);
     }
 
     @Test
     void makeOrder_WithEmptyCart_ShouldCreateEmptyOrder() {
         // Given
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.empty());
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.empty());
         when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(1L);
             return Mono.just(order);
         });
-        when(cartRepo.clearCart()).thenReturn(Mono.just(0));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(0));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).getAllCartPositions();
+        verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(argThat(order -> {
             assertTrue(order.getItems().isEmpty());
             assertEquals(0.0, order.getTotalSum(), 0.001);
             return true;
         }));
-        verify(cartRepo).clearCart();
+        verify(cartRepo).clearCart(userId);
     }
 
     @Test
     void getAllOrders_WhenNoOrdersExist_ShouldReturnEmptyFlux() {
         // Given
-        when(orderRepo.getAllWithPositions()).thenReturn(Flux.empty());
+        when(orderRepo.getAllWithPositions(userId)).thenReturn(Flux.empty());
 
         // When
-        Flux<OrderDto> result = orderService.getAllOrders();
+        Flux<OrderDto> result = orderService.getAllOrders(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(orderRepo).getAllWithPositions();
+        verify(orderRepo).getAllWithPositions(userId);
     }
 
     @Test
@@ -142,27 +144,27 @@ class OrderServiceTest {
         Order order1 = createOrder(1L, 50.0, 2);
         Order order2 = createOrder(2L, 75.0, 1);
 
-        when(orderRepo.getAllWithPositions()).thenReturn(Flux.just(order1, order2));
+        when(orderRepo.getAllWithPositions(userId)).thenReturn(Flux.just(order1, order2));
 
         // When
-        Flux<OrderDto> result = orderService.getAllOrders();
+        Flux<OrderDto> result = orderService.getAllOrders(userId);
 
         // Then
         StepVerifier.create(result)
                 .expectNextCount(2)
                 .verifyComplete();
 
-        verify(orderRepo).getAllWithPositions();
+        verify(orderRepo).getAllWithPositions(userId);
     }
 
     @Test
     void getOrderById_WhenOrderNotExists_ShouldThrowException() {
         // Given
         Long orderId = 999L;
-        when(orderRepo.getByIdWithPositions(orderId)).thenReturn(Mono.empty());
+        when(orderRepo.getByIdAndUserIdWithPositions(orderId, userId)).thenReturn(Mono.empty());
 
         // When
-        Mono<OrderDto> result = orderService.getOrderById(orderId);
+        Mono<OrderDto> result = orderService.getOrderById(orderId, userId);
 
         // Then
         StepVerifier.create(result)
@@ -171,7 +173,7 @@ class OrderServiceTest {
                                 throwable.getMessage().equals("order with id 999 not found!")
                 );
 
-        verify(orderRepo).getByIdWithPositions(orderId);
+        verify(orderRepo).getByIdAndUserIdWithPositions(orderId, userId);
     }
 
     @Test
@@ -179,49 +181,49 @@ class OrderServiceTest {
         // Given
         Long orderId = 1L;
         Order order = createOrder(orderId, 100.0, 2);
-        when(orderRepo.getByIdWithPositions(orderId)).thenReturn(Mono.just(order));
+        when(orderRepo.getByIdAndUserIdWithPositions(orderId, userId)).thenReturn(Mono.just(order));
 
         // When
-        Mono<OrderDto> result = orderService.getOrderById(orderId);
+        Mono<OrderDto> result = orderService.getOrderById(orderId, userId);
 
         // Then
         StepVerifier.create(result)
                 .expectNextCount(1)
                 .verifyComplete();
 
-        verify(orderRepo).getByIdWithPositions(orderId);
+        verify(orderRepo).getByIdAndUserIdWithPositions(orderId, userId);
     }
 
     @Test
     void getOrderById_WithZeroId_ShouldThrowException() {
         // Given
         Long orderId = 0L;
-        when(orderRepo.getByIdWithPositions(orderId)).thenReturn(Mono.empty());
+        when(orderRepo.getByIdAndUserIdWithPositions(orderId, userId)).thenReturn(Mono.empty());
 
         // When
-        Mono<OrderDto> result = orderService.getOrderById(orderId);
+        Mono<OrderDto> result = orderService.getOrderById(orderId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(OrderNotFoundException.class);
 
-        verify(orderRepo).getByIdWithPositions(orderId);
+        verify(orderRepo).getByIdAndUserIdWithPositions(orderId, userId);
     }
 
     @Test
     void getOrderById_WithNegativeId_ShouldThrowException() {
         // Given
         Long orderId = -1L;
-        when(orderRepo.getByIdWithPositions(orderId)).thenReturn(Mono.empty());
+        when(orderRepo.getByIdAndUserIdWithPositions(orderId, userId)).thenReturn(Mono.empty());
 
         // When
-        Mono<OrderDto> result = orderService.getOrderById(orderId);
+        Mono<OrderDto> result = orderService.getOrderById(orderId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(OrderNotFoundException.class);
 
-        verify(orderRepo).getByIdWithPositions(orderId);
+        verify(orderRepo).getByIdAndUserIdWithPositions(orderId, userId);
     }
 
     @Test
@@ -233,16 +235,16 @@ class OrderServiceTest {
         );
         // Total: 99 + 1999.98 = 2098.98
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(1L);
             return Mono.just(order);
         });
-        when(cartRepo.clearCart()).thenReturn(Mono.just(1));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
@@ -251,7 +253,7 @@ class OrderServiceTest {
         verify(orderRepo).save(argThat(order ->
                 Math.abs(2098.98 - order.getTotalSum()) < 0.001
         ));
-        verify(cartRepo).clearCart();
+        verify(cartRepo).clearCart(userId);
     }
 
     @Test
@@ -264,47 +266,46 @@ class OrderServiceTest {
         Order savedOrder = new Order();
         savedOrder.setId(1L);
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
-        when(cartRepo.clearCart()).thenReturn(Mono.error(new RuntimeException("Clear cart failed")));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.error(new RuntimeException("Clear cart failed")));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(RuntimeException.class);
 
-        verify(cartRepo).getAllCartPositions();
+        verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(any(Order.class));
-        verify(cartRepo).clearCart();
+        verify(cartRepo).clearCart(userId);
     }
 
     @Test
-    void makeOrder_WhenSaveOrderFails_ShouldNotClearCart() {
+    void makeOrder_WhenSaveOrderFails_ShouldNotclearCart() {
         // Given
         List<ItemDto> cartItems = Collections.singletonList(
                 new ItemDto(1L, "Item", "Desc", "/img.jpg", 10.0, 1)
         );
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.error(new RuntimeException("Save failed")));
 
         // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(RuntimeException.class);
 
-        verify(cartRepo).getAllCartPositions();
+        verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(any(Order.class));
-        verify(cartRepo, never()).clearCart();
+        verify(cartRepo, never()).clearCart(userId);
     }
 
     @Test
     void makeOrder_ShouldCallMethodsInCorrectOrder() {
-        // Given
         List<ItemDto> cartItems = Collections.singletonList(
                 new ItemDto(1L, "Item", "Desc", "/img.jpg", 10.0, 1)
         );
@@ -312,21 +313,19 @@ class OrderServiceTest {
         Order savedOrder = new Order();
         savedOrder.setId(1L);
 
-        when(cartRepo.getAllCartPositions()).thenReturn(Flux.fromIterable(cartItems));
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
-        when(cartRepo.clearCart()).thenReturn(Mono.just(1));
+        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
 
-        // When
-        Mono<Void> result = orderService.makeOrder();
+        Mono<Void> result = orderService.makeOrder(userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
         InOrder inOrder = inOrder(cartRepo, orderRepo, cartRepo);
-        inOrder.verify(cartRepo).getAllCartPositions();
+        inOrder.verify(cartRepo).getAllCartPositions(userId);
         inOrder.verify(orderRepo).save(any(Order.class));
-        inOrder.verify(cartRepo).clearCart();
+        inOrder.verify(cartRepo).clearCart(userId);
     }
 
     private Order createOrder(Long id, double totalSum, int itemCount) {

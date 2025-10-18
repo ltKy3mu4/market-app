@@ -3,9 +3,6 @@ package org.yandex.mymarketapp.repo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.r2dbc.repository.R2dbcRepository;
-import org.springframework.data.repository.query.Param;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import org.yandex.mymarketapp.model.domain.Order;
@@ -15,7 +12,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,31 +39,34 @@ public class OrderRepository {
     }
 
 
-    public Flux<Order> getAllWithPositions() {
+    public Flux<Order> getAllWithPositions(Long userId) {
         String sql = """
             SELECT o.id, o.total_sum, op.id as position_id, op.order_id, op.title, op.description, op.img_path, op.price, op.count
             FROM orders o
             LEFT JOIN order_positions op ON o.id = op.order_id
+            WHERE o.user_id = :userId
             ORDER BY o.id
             """;
 
         return databaseClient.sql(sql)
+                .bind("userId", userId)
                 .fetch()
                 .all()
                 .bufferUntilChanged(result -> result.get("id"))
                 .map(e -> mapToOrderWithPositions(e));
     }
 
-    public Mono<Order> getByIdWithPositions(long orderId) {
+    public Mono<Order> getByIdAndUserIdWithPositions(long orderId, Long userId) {
         String sql = """
             SELECT o.*, op.id as position_id, op.order_id, op.title, op.description, op.img_path, op.price, op.count
             FROM orders o 
             LEFT JOIN order_positions op ON o.id = op.order_id
-            WHERE o.id = :id
+            WHERE o.id = :id and o.user_id = :userId
             """;
 
         return databaseClient.sql(sql)
                 .bind("id", orderId)
+                .bind("userId", userId)
                 .fetch()
                 .all()
                 .collectList()

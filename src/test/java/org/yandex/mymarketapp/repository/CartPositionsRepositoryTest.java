@@ -4,10 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.jdbc.Sql;
-import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.CartPosition;
 import org.yandex.mymarketapp.model.domain.Item;
 import org.yandex.mymarketapp.model.dto.ItemDto;
@@ -17,12 +13,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.util.List;
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 
-//@Sql(scripts = "/sql/init-cartpositions.sql")
 class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Autowired
@@ -35,10 +27,12 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     void beforeEach(){
         this.executeSqlScript("sql/init-cartpositions.sql");
     }
+    
+    Long userId = 0L;
 
     @Test
     void findByItemId_WhenItemExistsInCart_ShouldReturnCartPosition() {
-        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemId(1L);
+        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemIdAndUserId(1L, userId);
 
         StepVerifier.create(foundCartPosition)
                 .assertNext(cartPosition -> {
@@ -50,7 +44,7 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findByItemId_WhenItemNotInCart_ShouldReturnEmpty() {
-        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemId(999L);
+        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemIdAndUserId(999L, userId);
 
         StepVerifier.create(foundCartPosition)
                 .verifyComplete();
@@ -60,15 +54,13 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     void increaseItemCount_ShouldIncrementCountByOne() {
         Long itemId = 1L;
 
-        // Get initial count
-        Mono<Integer> initialCountMono = cartPositionsRepository.findByItemId(itemId)
+        Mono<Integer> initialCountMono = cartPositionsRepository.findByItemIdAndUserId(itemId, userId)
                 .map(CartPosition::getCount);
 
-        // Increase count and verify
         Mono<Integer> operation = initialCountMono
                 .flatMap(initialCount ->
-                        cartPositionsRepository.increaseItemCount(itemId)
-                                .then(cartPositionsRepository.findByItemId(itemId))
+                        cartPositionsRepository.increaseItemCount(itemId, userId)
+                                .then(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
                                 .map(updated -> updated.getCount())
                                 .doOnNext(updatedCount -> assertEquals(initialCount + 1, updatedCount))
                 );
@@ -83,13 +75,13 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
         Long itemId = 1L;
 
         // Get initial count and ensure it's > 1
-        Mono<CartPosition> initialCartPosition = cartPositionsRepository.findByItemId(itemId)
+        Mono<CartPosition> initialCartPosition = cartPositionsRepository.findByItemIdAndUserId(itemId, userId)
                 .filter(cp -> cp.getCount() > 1);
 
         Mono<Integer> operation = initialCartPosition
                 .flatMap(initial ->
-                        cartPositionsRepository.decreaseItemCount(itemId)
-                                .then(cartPositionsRepository.findByItemId(itemId))
+                        cartPositionsRepository.decreaseItemCount(itemId, userId)
+                                .then(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
                                 .map(updated -> updated.getCount())
                                 .doOnNext(updatedCount -> assertEquals(initial.getCount() - 1, updatedCount))
                 );
@@ -104,19 +96,19 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
         Long itemId = 1L;
 
         // First verify the item exists in cart
-        StepVerifier.create(cartPositionsRepository.findByItemId(itemId))
+        StepVerifier.create(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
                 .expectNextCount(1)
                 .verifyComplete();
 
         // Remove the item
-        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(itemId);
+        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(itemId, userId);
 
         StepVerifier.create(removeOperation)
                 .expectNext(1) // Should remove 1 row
                 .verifyComplete();
 
         // Verify the item is no longer in cart
-        StepVerifier.create(cartPositionsRepository.findByItemId(itemId))
+        StepVerifier.create(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
                 .verifyComplete();
     }
 
@@ -124,7 +116,7 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     void removeItemFromCartByItemId_WhenItemNotInCart_ShouldReturnZero() {
         Long nonExistentItemId = 999L;
 
-        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(nonExistentItemId);
+        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(nonExistentItemId, userId);
 
         StepVerifier.create(removeOperation)
                 .expectNext(0) // Should remove 0 rows
@@ -139,7 +131,7 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
                 .verifyComplete();
 
         // Clear the cart
-        Mono<Integer> clearOperation = cartPositionsRepository.clearCart();
+        Mono<Integer> clearOperation = cartPositionsRepository.clearCart(userId);
 
         StepVerifier.create(clearOperation)
                 .expectNextMatches(rowsAffected -> rowsAffected > 0)
@@ -163,7 +155,7 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
                     newCartPosition.setCount(1);
                     return cartPositionsRepository.save(newCartPosition);
                 })
-                .flatMap(saved -> cartPositionsRepository.findByItemId(saved.getItemId()));
+                .flatMap(saved -> cartPositionsRepository.findByItemIdAndUserId(saved.getItemId(), userId));
 
         StepVerifier.create(saveOperation)
                 .assertNext(cartPosition -> {
@@ -236,7 +228,7 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void getAllCartPositions_ShouldReturnItemDtos() {
-        Flux<ItemDto> cartItems = cartPositionsRepository.getAllCartPositions();
+        Flux<ItemDto> cartItems = cartPositionsRepository.getAllCartPositions(userId);
 
         StepVerifier.create(cartItems.collectList())
                 .assertNext(items -> {
@@ -250,10 +242,10 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     @Test
     void save_ShouldCreateCartPositionWithCountOne() {
         Long itemId = 3L;
-        CartPosition newCartPosition = new CartPosition(itemId);
+        CartPosition newCartPosition = new CartPosition(itemId, userId);
 
         Mono<CartPosition> saveOperation = cartPositionsRepository.save(newCartPosition)
-                .flatMap(saved -> cartPositionsRepository.findByItemId(itemId));
+                .flatMap(saved -> cartPositionsRepository.findByItemIdAndUserId(itemId, userId));
 
         StepVerifier.create(saveOperation)
                 .assertNext(cartPosition -> {
@@ -266,11 +258,11 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     @Test
     void decreaseItemCount_WhenCountIsOne_ShouldRemoveItem() {
         Long itemId = 3L;
-        CartPosition cartPosition = new CartPosition(itemId);
+        CartPosition cartPosition = new CartPosition(itemId, userId);
         cartPosition.setCount(1);
 
         Mono<Integer> operation = cartPositionsRepository.save(cartPosition)
-                .then(cartPositionsRepository.decreaseItemCount(itemId));
+                .then(cartPositionsRepository.decreaseItemCount(itemId, userId));
 
         StepVerifier.create(operation)
                 .verifyError(DataIntegrityViolationException.class);

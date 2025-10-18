@@ -15,9 +15,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.util.Collections;
-import java.util.List;
-
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -33,6 +30,8 @@ class CartServiceTest {
     @Autowired
     private CartService cartService;
 
+    private Long userId =0L; 
+    
     @Test
     void increaseQuantityInCart_WhenItemNotInCart_ShouldCreateNewCartPosition() {
         // Given
@@ -42,48 +41,48 @@ class CartServiceTest {
         mockItem.setTitle("Test Item");
         mockItem.setPrice(10.0);
 
-        CartPosition newCartPosition = new CartPosition(itemId);
+        CartPosition newCartPosition = new CartPosition(itemId, userId);
         newCartPosition.setId(1L);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.empty());
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.empty());
         when(itemsRepo.findById(itemId)).thenReturn(Mono.just(mockItem));
         when(cartRepo.save(any(CartPosition.class))).thenReturn(Mono.just(newCartPosition));
 
         // When
-        Mono<Void> result = cartService.increaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.increaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findByItemId(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
         verify(itemsRepo).findById(itemId);
         verify(cartRepo).save(argThat(cartPosition ->
                 cartPosition.getItemId().equals(itemId) && cartPosition.getCount() == 1
         ));
-        verify(cartRepo, never()).increaseItemCount(itemId);
+        verify(cartRepo, never()).increaseItemCount(itemId, userId);
     }
 
     @Test
     void increaseQuantityInCart_WhenItemAlreadyInCart_ShouldIncreaseCount() {
         // Given
         Long itemId = 1L;
-        CartPosition existingCartPosition = new CartPosition(itemId);
+        CartPosition existingCartPosition = new CartPosition(itemId, userId);
         existingCartPosition.setId(1L);
         existingCartPosition.setCount(2);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.just(existingCartPosition));
-        when(cartRepo.increaseItemCount(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.just(existingCartPosition));
+        when(cartRepo.increaseItemCount(itemId, userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = cartService.increaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.increaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findByItemId(itemId);
-        verify(cartRepo).increaseItemCount(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
+        verify(cartRepo).increaseItemCount(itemId, userId);
         verify(itemsRepo, never()).findById(itemId);  // This should not be called
         verify(cartRepo, never()).save(any());
     }
@@ -92,131 +91,128 @@ class CartServiceTest {
     void increaseQuantityInCart_WhenItemNotFound_ShouldThrowException() {
         // Given
         Long itemId = 999L;
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.empty());
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.empty());
         when(itemsRepo.findById(itemId)).thenReturn(Mono.empty());
 
         // When
-        Mono<Void> result = cartService.increaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.increaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(ItemNotFoundException.class);
 
-        verify(cartRepo).findByItemId(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
         verify(itemsRepo).findById(itemId);
         verify(cartRepo, never()).save(any());
-        verify(cartRepo, never()).increaseItemCount(any());
+        verify(cartRepo, never()).increaseItemCount(any(), any());
     }
 
     @Test
     void decreaseQuantityInCart_WhenItemNotInCart_ShouldDoNothing() {
         // Given
         Long itemId = 1L;
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.empty());
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.empty());
 
         // When
-        Mono<Void> result = cartService.decreaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.decreaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findByItemId(itemId);
-        verify(cartRepo, never()).decreaseItemCount(any());
-        verify(cartRepo, never()).removeItemFromCartByItemId(any());
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
+        verify(cartRepo, never()).decreaseItemCount(any(), any());
+        verify(cartRepo, never()).removeItemFromCartByItemId(any(), any());
     }
 
     @Test
     void decreaseQuantityInCart_WhenCountGreaterThanOne_ShouldDecreaseCount() {
         // Given
         Long itemId = 1L;
-        CartPosition existingCartPosition = new CartPosition(itemId);
+        CartPosition existingCartPosition = new CartPosition(itemId, userId);
         existingCartPosition.setId(1L);
         existingCartPosition.setCount(3);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.just(existingCartPosition));
-        when(cartRepo.decreaseItemCount(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.just(existingCartPosition));
+        when(cartRepo.decreaseItemCount(itemId, userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = cartService.decreaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.decreaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findByItemId(itemId);
-        verify(cartRepo).decreaseItemCount(itemId);
-        verify(cartRepo, never()).removeItemFromCartByItemId(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
+        verify(cartRepo).decreaseItemCount(itemId, userId);
+        verify(cartRepo, never()).removeItemFromCartByItemId(itemId, userId);
     }
 
     @Test
     void decreaseQuantityInCart_WhenCountIsOne_ShouldRemoveFromCart() {
         // Given
         Long itemId = 1L;
-        CartPosition existingCartPosition = new CartPosition(itemId);
+        CartPosition existingCartPosition = new CartPosition(itemId, userId);
         existingCartPosition.setId(1L);
         existingCartPosition.setCount(1);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.just(existingCartPosition));
-        when(cartRepo.removeItemFromCartByItemId(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.just(existingCartPosition));
+        when(cartRepo.removeItemFromCartByItemId(itemId, userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = cartService.decreaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.decreaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findByItemId(itemId);
-        verify(cartRepo).removeItemFromCartByItemId(itemId);
-        verify(cartRepo, never()).decreaseItemCount(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
+        verify(cartRepo).removeItemFromCartByItemId(itemId, userId);
+        verify(cartRepo, never()).decreaseItemCount(itemId, userId);
     }
 
     @Test
     void removeFromCart_WhenItemExists_ShouldRemoveAndLogSuccess() {
         // Given
         Long itemId = 1L;
-        when(cartRepo.removeItemFromCartByItemId(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.removeItemFromCartByItemId(itemId, userId)).thenReturn(Mono.just(1));
 
         // When
-        Mono<Void> result = cartService.removeFromCart(itemId);
+        Mono<Void> result = cartService.removeFromCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).removeItemFromCartByItemId(itemId);
+        verify(cartRepo).removeItemFromCartByItemId(itemId, userId);
     }
 
     @Test
     void removeFromCart_WhenItemNotExists_ShouldLogWarning() {
         // Given
         Long itemId = 999L;
-        when(cartRepo.removeItemFromCartByItemId(itemId)).thenReturn(Mono.just(0));
+        when(cartRepo.removeItemFromCartByItemId(itemId, userId)).thenReturn(Mono.just(0));
 
         // When
-        Mono<Void> result = cartService.removeFromCart(itemId);
+        Mono<Void> result = cartService.removeFromCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).removeItemFromCartByItemId(itemId);
+        verify(cartRepo).removeItemFromCartByItemId(itemId, userId);
     }
 
     @Test
     void getCartItems_WhenCartIsEmpty_ShouldReturnEmptyList() {
-        // Given
-        when(cartRepo.findAll()).thenReturn(Flux.empty());
+        when(cartRepo.findByUserId(userId)).thenReturn(Flux.empty());
 
-        // When
-        Flux<ItemDto> result = cartService.getCartItems();
+        Flux<ItemDto> result = cartService.getCartItems(userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(cartRepo).findAll();
+        verify(cartRepo).findByUserId(userId);
         verify(itemsRepo, never()).getItemById(any());
     }
 
@@ -224,21 +220,21 @@ class CartServiceTest {
     void getCartItems_WhenItemNotFound_ShouldThrowException() {
         // Given
         Long itemId = 1L;
-        CartPosition cp = new CartPosition(itemId);
+        CartPosition cp = new CartPosition(itemId, userId);
         cp.setId(1L);
         cp.setCount(1);
 
-        when(cartRepo.findAll()).thenReturn(Flux.just(cp));
+        when(cartRepo.findByUserId(userId)).thenReturn(Flux.just(cp));
         when(itemsRepo.getItemById(itemId)).thenReturn(Mono.empty());
 
         // When
-        Flux<ItemDto> result = cartService.getCartItems();
+        Flux<ItemDto> result = cartService.getCartItems(userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(ItemNotFoundException.class);
 
-        verify(cartRepo).findAll();
+        verify(cartRepo).findByUserId(userId);
         verify(itemsRepo).getItemById(itemId);
     }
 
@@ -246,7 +242,7 @@ class CartServiceTest {
     void getCartItems_WhenItemsExist_ShouldReturnItemDtos() {
         // Given
         Long itemId = 1L;
-        CartPosition cp = new CartPosition(itemId);
+        CartPosition cp = new CartPosition(itemId, userId);
         cp.setId(1L);
         cp.setCount(2);
 
@@ -255,22 +251,20 @@ class CartServiceTest {
         item.setTitle("Test Item");
         item.setPrice(10.0);
 
-        ItemDto expectedDto = new ItemDto(itemId, "Test Item", "Description", "/img.jpg", 10.0, 2);
-
-        when(cartRepo.findAll()).thenReturn(Flux.just(cp));
+        when(cartRepo.findByUserId(userId)).thenReturn(Flux.just(cp));
         when(itemsRepo.getItemById(itemId)).thenReturn(Mono.just(item));
         // Mock the mapper behavior
         when(itemsRepo.getItemById(itemId)).thenReturn(Mono.just(item));
 
         // When
-        Flux<ItemDto> result = cartService.getCartItems();
+        Flux<ItemDto> result = cartService.getCartItems(userId);
 
         // Then
         StepVerifier.create(result)
                 .expectNextMatches(dto -> dto.id() == itemId && dto.count() == 2)
                 .verifyComplete();
 
-        verify(cartRepo).findAll();
+        verify(cartRepo).findByUserId(userId);
         verify(itemsRepo).getItemById(itemId);
     }
 
@@ -278,39 +272,39 @@ class CartServiceTest {
     void decreaseQuantityInCart_WhenMultipleCalls_ShouldHandleCorrectly() {
         // Given - First call: count > 1
         Long itemId = 1L;
-        CartPosition cartPosition = new CartPosition(itemId);
+        CartPosition cartPosition = new CartPosition(itemId, userId);
         cartPosition.setId(1L);
         cartPosition.setCount(3);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.just(cartPosition));
-        when(cartRepo.decreaseItemCount(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.just(cartPosition));
+        when(cartRepo.decreaseItemCount(itemId, userId)).thenReturn(Mono.just(1));
 
         // When - First decrease (3 -> 2)
-        Mono<Void> firstCall = cartService.decreaseQuantityInCart(itemId);
+        Mono<Void> firstCall = cartService.decreaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(firstCall)
                 .verifyComplete();
 
-        verify(cartRepo).decreaseItemCount(itemId);
+        verify(cartRepo).decreaseItemCount(itemId, userId);
 
         // Reset mocks for second call
         reset(cartRepo);
 
         // Given - Second call: count == 1
         cartPosition.setCount(1);
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.just(cartPosition));
-        when(cartRepo.removeItemFromCartByItemId(itemId)).thenReturn(Mono.just(1));
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.just(cartPosition));
+        when(cartRepo.removeItemFromCartByItemId(itemId, userId)).thenReturn(Mono.just(1));
 
         // When - Second decrease (1 -> remove)
-        Mono<Void> secondCall = cartService.decreaseQuantityInCart(itemId);
+        Mono<Void> secondCall = cartService.decreaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(secondCall)
                 .verifyComplete();
 
-        verify(cartRepo).removeItemFromCartByItemId(itemId);
-        verify(cartRepo, never()).decreaseItemCount(itemId);
+        verify(cartRepo).removeItemFromCartByItemId(itemId, userId);
+        verify(cartRepo, never()).decreaseItemCount(itemId, userId);
     }
 
     @Test
@@ -320,18 +314,18 @@ class CartServiceTest {
         Item mockItem = new Item();
         mockItem.setId(itemId);
 
-        when(cartRepo.findByItemId(itemId)).thenReturn(Mono.empty());
+        when(cartRepo.findByItemIdAndUserId(itemId, userId)).thenReturn(Mono.empty());
         when(itemsRepo.findById(itemId)).thenReturn(Mono.just(mockItem));
         when(cartRepo.save(any(CartPosition.class))).thenReturn(Mono.error(new RuntimeException("DB error")));
 
         // When
-        Mono<Void> result = cartService.increaseQuantityInCart(itemId);
+        Mono<Void> result = cartService.increaseQuantityInCart(itemId, userId);
 
         // Then
         StepVerifier.create(result)
                 .verifyError(RuntimeException.class);
 
-        verify(cartRepo).findByItemId(itemId);
+        verify(cartRepo).findByItemIdAndUserId(itemId, userId);
         verify(itemsRepo).findById(itemId);
         verify(cartRepo).save(any(CartPosition.class));
     }
@@ -342,11 +336,11 @@ class CartServiceTest {
         Long itemId1 = 1L;
         Long itemId2 = 2L;
 
-        CartPosition cp1 = new CartPosition(itemId1);
+        CartPosition cp1 = new CartPosition(itemId1, userId);
         cp1.setId(1L);
         cp1.setCount(2);
 
-        CartPosition cp2 = new CartPosition(itemId2);
+        CartPosition cp2 = new CartPosition(itemId2, userId);
         cp2.setId(2L);
         cp2.setCount(1);
 
@@ -358,19 +352,19 @@ class CartServiceTest {
         item2.setId(itemId2);
         item2.setTitle("Item 2");
 
-        when(cartRepo.findAll()).thenReturn(Flux.just(cp1, cp2));
+        when(cartRepo.findByUserId(userId)).thenReturn(Flux.just(cp1, cp2));
         when(itemsRepo.getItemById(itemId1)).thenReturn(Mono.just(item1));
         when(itemsRepo.getItemById(itemId2)).thenReturn(Mono.just(item2));
 
         // When
-        Flux<ItemDto> result = cartService.getCartItems();
+        Flux<ItemDto> result = cartService.getCartItems(userId);
 
         // Then
         StepVerifier.create(result)
                 .expectNextCount(2)
                 .verifyComplete();
 
-        verify(cartRepo).findAll();
+        verify(cartRepo).findByUserId(userId);
         verify(itemsRepo).getItemById(itemId1);
         verify(itemsRepo).getItemById(itemId2);
     }

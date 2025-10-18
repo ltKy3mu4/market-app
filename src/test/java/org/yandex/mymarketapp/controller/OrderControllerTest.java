@@ -39,7 +39,7 @@ class OrderControllerTest {
                 ), 75.0)
         );
 
-        when(orderService.getAllOrders()).thenReturn(Flux.fromIterable(mockOrders));
+        when(orderService.getAllOrders(0L)).thenReturn(Flux.fromIterable(mockOrders));
 
         webTestClient.get()
                 .uri("/orders")
@@ -51,19 +51,19 @@ class OrderControllerTest {
                     // We can verify the service was called and response is successful
                 });
 
-        verify(orderService).getAllOrders();
+        verify(orderService).getAllOrders(0L);
     }
 
     @Test
     void showOrders_WhenNoOrdersExist_ShouldReturnEmptyList() {
-        when(orderService.getAllOrders()).thenReturn(Flux.empty());
+        when(orderService.getAllOrders(0L)).thenReturn(Flux.empty());
 
         webTestClient.get()
                 .uri("/orders")
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getAllOrders();
+        verify(orderService).getAllOrders(0L);
     }
 
     @Test
@@ -74,20 +74,20 @@ class OrderControllerTest {
                 new ItemDto(2L, "Item 2", "Description 2", "/img2.jpg", 25.0, 2)
         ), 150.0);
 
-        when(orderService.getOrderById(orderId)).thenReturn(Mono.just(mockOrder));
+        when(orderService.getOrderById(orderId, 0L)).thenReturn(Mono.just(mockOrder));
 
         webTestClient.get()
                 .uri("/orders/{id}", orderId)
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getOrderById(orderId);
+        verify(orderService).getOrderById(orderId, 0L);
     }
 
     @Test
     void showOrderDetails_WithNonExistentId_ShouldThrowException() {
         Long nonExistentOrderId = 999L;
-        when(orderService.getOrderById(nonExistentOrderId))
+        when(orderService.getOrderById(nonExistentOrderId, 0L))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + nonExistentOrderId)));
 
         webTestClient.get()
@@ -95,7 +95,7 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(nonExistentOrderId);
+        verify(orderService).getOrderById(nonExistentOrderId, 0L);
     }
 
     @Test
@@ -110,8 +110,8 @@ class OrderControllerTest {
                 new ItemDto(2L, "Item B", "Desc B", "/imgB.jpg", 100.0, 2)
         ), 200.0);
 
-        when(orderService.getOrderById(orderId1)).thenReturn(Mono.just(mockOrder1));
-        when(orderService.getOrderById(orderId2)).thenReturn(Mono.just(mockOrder2));
+        when(orderService.getOrderById(orderId1, 0L)).thenReturn(Mono.just(mockOrder1));
+        when(orderService.getOrderById(orderId2, 0L)).thenReturn(Mono.just(mockOrder2));
 
         // Test first order
         webTestClient.get()
@@ -125,14 +125,14 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getOrderById(orderId1);
-        verify(orderService).getOrderById(orderId2);
+        verify(orderService).getOrderById(orderId1, 0L);
+        verify(orderService).getOrderById(orderId2, 0L);
     }
 
     @Test
     void showOrderDetails_WithZeroId_ShouldThrowException() {
         Long zeroId = 0L;
-        when(orderService.getOrderById(zeroId))
+        when(orderService.getOrderById(zeroId, 0L))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + zeroId)));
 
         webTestClient.get()
@@ -140,13 +140,13 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(zeroId);
+        verify(orderService).getOrderById(zeroId, 0L);
     }
 
     @Test
     void showOrderDetails_WithNegativeId_ShouldThrowException() {
         Long negativeId = -1L;
-        when(orderService.getOrderById(negativeId))
+        when(orderService.getOrderById(negativeId, 0L))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + negativeId)));
 
         webTestClient.get()
@@ -154,13 +154,13 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(negativeId);
+        verify(orderService).getOrderById(negativeId, 0L);
     }
 
 
     @Test
     void showOrders_WhenServiceReturnsError_ShouldHandleGracefully() {
-        when(orderService.getAllOrders())
+        when(orderService.getAllOrders(0L))
                 .thenReturn(Flux.error(new RuntimeException("Service error")));
 
         webTestClient.get()
@@ -168,7 +168,7 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(orderService).getAllOrders();
+        verify(orderService).getAllOrders(0L);
     }
 
 }
