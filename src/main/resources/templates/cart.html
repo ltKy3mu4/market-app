@@ -31,15 +31,39 @@
                             <span class="badge text-bg-success justify-content-end" th:text="${item.price()}+' руб.'"></span>
                         </h5>
                         <p class="card-text" th:text="${item.description()}"></p>
-                        <form th:action="@{/cart/items}" method="post">
-                            <div class="hstack gap-3">
+                        <div class="hstack gap-3">
+                            <!-- MINUS button form -->
+                            <form th:action="@{/cart/items}" method="post" style="display: inline;">
                                 <input type="hidden" name="id" th:value="${item.id()}">
-                                <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>
-                                <span th:text="${item.count()}"></span>
-                                <button type="submit" class="btn btn-outline-secondary" name="action" value="PLUS">+</button>
-                                <button type="submit" class="btn btn-danger ms-auto bi bi-trash" name="action" value="DELETE"></button>
-                            </div>
-                        </form>
+                                <input type="hidden" name="action" value="MINUS">
+                                <button type="submit" class="btn btn-outline-secondary">-</button>
+                            </form>
+
+                            <span th:text="${item.count()}"></span>
+
+                            <!-- PLUS button form -->
+                            <form th:action="@{/cart/items}" method="post" style="display: inline;">
+                                <input type="hidden" name="id" th:value="${item.id()}">
+                                <input type="hidden" name="action" value="PLUS">
+                                <button type="submit" class="btn btn-outline-secondary">+</button>
+                            </form>
+
+                            <!-- Add to cart form (only shows when count is 0) -->
+                            <form th:action="@{/cart/items}" method="post" style="display: inline;" th:if="${item.count()==0}">
+                                <input type="hidden" name="action" value="DELETE">
+                                <input type="hidden" name="id" th:value="${item.id()}">
+                                <button type="submit" class="btn btn-danger ms-auto bi bi-trash"></button>
+                            </form>
+                        </div>
+<!--                        <form th:action="@{/cart/items}" method="post">-->
+<!--                            <div class="hstack gap-3">-->
+<!--                                <input type="hidden" name="id" th:value="${item.id()}">-->
+<!--                                <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>-->
+<!--                                <span th:text="${item.count()}"></span>-->
+<!--                                <button type="submit" class="btn btn-outline-secondary" name="action" value="PLUS">+</button>-->
+<!--                                <button type="submit" class="btn btn-danger ms-auto bi bi-trash" name="action" value="DELETE"></button>-->
+<!--                            </div>-->
+<!--                        </form>-->
                     </div>
                 </div>
             </div>

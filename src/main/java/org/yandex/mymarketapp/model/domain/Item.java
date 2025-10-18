@@ -1,25 +1,26 @@
 package org.yandex.mymarketapp.model.domain;
 
-import jakarta.persistence.*;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
 @Table(name = "items")
 public class Item {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
-    @Column(nullable = false)
+    @Column
     private String title;
+    @Column
     private String description;
-    @Column(nullable = false, name = "img_path")
+    @Column
     private String imgPath;
-    @Column(nullable = false)
+    @Column
     @Positive
     private double price;
 }

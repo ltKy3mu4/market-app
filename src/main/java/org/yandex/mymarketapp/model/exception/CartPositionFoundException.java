@@ -1,6 +1,6 @@
 package org.yandex.mymarketapp.model.exception;
 
-public class CartPositionFoundException extends MarketExcpetion {
+public class CartPositionFoundException extends MarketException {
     public CartPositionFoundException(String message) {
         super(message);
     }

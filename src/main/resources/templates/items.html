@@ -62,19 +62,59 @@
                             <span class="badge text-bg-success justify-content-end" th:text="${item.price()}+' руб.'"></span>
                         </h5>
                         <p class="card-text" th:text="${item.description()}"></p>
-                        <form method="post" th:action="@{/items}">
-                            <div class="hstack gap-3">
+
+                        <div class="hstack gap-3">
+                            <!-- MINUS button form -->
+                            <form th:action="@{${'/items'}}" method="post" style="display: inline;">
                                 <input type="hidden" name="id" th:value="${item.id()}">
                                 <input type="hidden" name="search" th:value="${search}">
                                 <input type="hidden" name="sort" th:value="${sort}">
                                 <input type="hidden" name="pageSize" th:value="${paging.pageSize()}">
                                 <input type="hidden" name="pageNumber" th:value="${paging.pageNumber()}">
-                                <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>
-                                <span th:text="${item.count()}"></span>
-                                <button type="submit" class="btn btn-outline-secondary" name="action" value="PLUS">+</button>
-                                <button type="submit" class="btn btn-warning ms-auto bi bi-cart4" name="action" value="PLUS" th:if="${item.count()==0}"></button>
-                            </div>
-                        </form>
+                                <input type="hidden" name="action" value="MINUS">
+                                <button type="submit" class="btn btn-outline-secondary">-</button>
+                            </form>
+
+                            <span th:text="${item.count()}"></span>
+
+                            <!-- PLUS button form -->
+                            <form th:action="@{${'/items'}}" method="post" style="display: inline;">
+                                <input type="hidden" name="id" th:value="${item.id()}">
+                                <input type="hidden" name="search" th:value="${search}">
+                                <input type="hidden" name="sort" th:value="${sort}">
+                                <input type="hidden" name="pageSize" th:value="${paging.pageSize()}">
+                                <input type="hidden" name="pageNumber" th:value="${paging.pageNumber()}">
+
+                                <input type="hidden" name="action" value="PLUS">
+                                <button type="submit" class="btn btn-outline-secondary">+</button>
+                            </form>
+
+                            <!-- Add to cart form (only shows when count is 0) -->
+                            <form th:action="@{${'/items'}}" method="post" style="display: inline;" th:if="${item.count()==0}">
+                                <input type="hidden" name="id" th:value="${item.id()}">
+                                <input type="hidden" name="search" th:value="${search}">
+                                <input type="hidden" name="sort" th:value="${sort}">
+                                <input type="hidden" name="pageSize" th:value="${paging.pageSize()}">
+                                <input type="hidden" name="pageNumber" th:value="${paging.pageNumber()}">
+
+                                <input type="hidden" name="action" value="PLUS">
+                                <button type="submit" class="btn btn-warning ms-auto bi bi-cart4"></button>
+                            </form>
+                        </div>
+
+<!--                        <form method="post" th:action="@{/items}">-->
+<!--                            <div class="hstack gap-3">-->
+<!--                                <input type="hidden" name="id" th:value="${item.id()}">-->
+<!--                                <input type="hidden" name="search" th:value="${search}">-->
+<!--                                <input type="hidden" name="sort" th:value="${sort}">-->
+<!--                                <input type="hidden" name="pageSize" th:value="${paging.pageSize()}">-->
+<!--                                <input type="hidden" name="pageNumber" th:value="${paging.pageNumber()}">-->
+<!--                                <button type="submit" class="btn btn-outline-secondary" name="action" th:value="MINUS">-</button>-->
+<!--                                <span th:text="${item.count()}"></span>-->
+<!--                                <button type="submit" class="btn btn-outline-secondary" name="action" th:value="PLUS">+</button>-->
+<!--                                <button type="submit" class="btn btn-warning ms-auto bi bi-cart4" name="action" th:value="PLUS" th:if="${item.count()==0}"></button>-->
+<!--                            </div>-->
+<!--                        </form>-->
                     </div>
                 </div>
                 <div th:unless="${item.id() != -1}">&nbsp;</div>

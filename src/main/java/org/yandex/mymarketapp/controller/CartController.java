@@ -3,15 +3,11 @@ package org.yandex.mymarketapp.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.yandex.mymarketapp.model.dto.ItemDto;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.OrderService;
-
-import java.util.List;
+import reactor.core.publisher.Mono;
 
 @Controller
 @RequestMapping("/cart")
@@ -22,38 +18,40 @@ public class CartController {
     private final OrderService orderService;
 
     @GetMapping("/items")
-    public String showCart(Model model) {
-        List<ItemDto> cartItems = cartService.getCartItems();
-        double totalPrice =  cartItems.stream().mapToDouble(e-> e.price()*e.count()).sum();
-        model.addAttribute("items", cartItems);
-        model.addAttribute("total", totalPrice);
-
-        return "cart";
+    public Mono<String> showCart(Model model, @RequestParam(defaultValue = "0") Long userId) {
+        return cartService.getCartItems(userId)
+                .collectList()
+                .doOnNext(items -> {
+                    model.addAttribute("items", items);
+                    double totalPrice =  items.stream().mapToDouble(e-> e.price()*e.count()).sum();
+                    model.addAttribute("total", totalPrice);
+                }).thenReturn("cart");
     }
 
     @PostMapping("/items")
-    public String updateCartItem(@RequestParam Long id, @RequestParam String action) {
+    public Mono<String> updateCartItem(@ModelAttribute CartBuyForm form, @RequestParam(defaultValue = "0") Long userId) {
 
-        switch (action) {
-            case "PLUS":
-                cartService.increaseQuantityInCart(id);
-                break;
-            case "MINUS":
-                cartService.decreaseQuantityInCart(id);
-                break;
-            case "DELETE":
-                cartService.removeFromCart(id);
-                break;
+        if (form == null || form.action() == null || form.id() == null) {
+            return Mono.just(UriComponentsBuilder.fromPath("redirect:/cart/items")
+                    .build()
+                    .toUriString());
         }
 
-        return "redirect:/cart/items";
+
+        Mono<Void> operation = switch (form.action()) {
+            case "PLUS" -> cartService.increaseQuantityInCart(form.id, userId);
+            case "MINUS" -> cartService.decreaseQuantityInCart(form.id, userId);
+            case "DELETE" -> cartService.removeFromCart(form.id, userId);
+            default -> Mono.empty();
+        };
+
+        return operation.thenReturn("redirect:/cart/items");
     }
 
     @PostMapping("/buy")
-    public String buyItems() {
-        List<ItemDto> items = cartService.getCartItems();
-        cartService.clearCart();
-        orderService.makeOrder(items);
-        return "redirect:/orders"; // Redirect to orders page after purchase
+    public Mono<String> buyItems(@RequestParam(defaultValue = "0") Long userId) {
+        return orderService.makeOrder(userId).thenReturn("redirect:/orders");
     }
+
+    public record CartBuyForm(Long id, String action){};
 }

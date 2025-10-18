@@ -7,9 +7,9 @@ FROM orders;
 ALTER SEQUENCE orders_id_seq RESTART WITH 1;
 ALTER SEQUENCE order_positions_id_seq RESTART WITH 1;
 
-INSERT INTO orders (total_sum)
-VALUES (150.0),
-       (200.0);
+INSERT INTO orders (total_sum, user_id)
+VALUES (150.0, 0),
+       (200.0, 0);
 
 INSERT INTO order_positions ( order_id, title, description, img_path, price, count)
 VALUES ( 1, 'Test Item 1', 'Test Description 1', '/images/test1.jpg', 50.0, 2),

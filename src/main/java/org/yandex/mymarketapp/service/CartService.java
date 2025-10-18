@@ -5,16 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.CartPosition;
-import org.yandex.mymarketapp.model.domain.Item;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.model.mapper.ItemMapper;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.ItemRepository;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
@@ -27,56 +24,57 @@ public class CartService {
     private final ItemMapper itemMapper;
 
     @Transactional
-    public void increaseQuantityInCart(Long itemId){
-        Optional<CartPosition> cp = cartRepo.findByItemId(itemId);
-        if (cp.isEmpty()) {
-            log.info("adding new cart position for id {}", itemId);
-            Item item = itemsRepo.getItemById(itemId).orElseThrow(() -> new ItemNotFoundException("Item "+itemId+" cannot be added to cart cause such id is not present"));
-            CartPosition c = new CartPosition(item);
-            cartRepo.save(c);
-        } else {
-            log.info("Count of items with id {} increased", itemId);
-            cartRepo.increaseItemCount(itemId);
-        }
+    public Mono<Void> increaseQuantityInCart(Long itemId, Long userId) {
+        return cartRepo.findByItemIdAndUserId(itemId, userId)
+                .hasElement()
+                .flatMap(itemExists -> {
+                    if (itemExists) {
+                        log.info("Count of items with id {} for user {} increased", itemId, userId);
+                        return cartRepo.increaseItemCount(itemId, userId).then();
+                    } else {
+                        return itemsRepo.findById(itemId)
+                                .switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found with id " + itemId + " for user "+ userId)))
+                                .doOnNext(item -> log.info("Saved item with id {} for user {} increased", item.getId(), userId))
+                                .flatMap(item -> cartRepo.save(new CartPosition(item.getId(), userId)))
+                                .then();
+                    }
+                });
     }
 
     @Transactional
-    public void decreaseQuantityInCart(Long itemId){
-        Optional<CartPosition> cp = cartRepo.findByItemId(itemId);
-        if (cp.isEmpty()) {
-            log.info("there is nothing to remove from cart for id {}", itemId);
-            return;
-        }
-        if (cp.get().getCount() <= 1) {
-            this.removeFromCart(itemId);
-        } else {
-            log.info("Count of items with id {} decreased", itemId);
-            cartRepo.decreaseItemCount(itemId);
-        }
+    public Mono<Void> decreaseQuantityInCart(Long itemId, Long userId) {
+        return cartRepo.findByItemIdAndUserId(itemId, userId)
+                .flatMap(cartPosition -> {
+                    if (cartPosition.getCount() <= 1) {
+                        log.info("Count of items with id {} is 1 or less, removing from cart", itemId);
+                        return removeFromCart(itemId, userId);
+                    } else {
+                        log.info("Count of items with id {} for user {} decreased", itemId, userId);
+                        return cartRepo.decreaseItemCount(itemId, userId).then();
+                    }
+                })
+                .switchIfEmpty(Mono.fromRunnable(() ->
+                        log.info("there is nothing to remove from cart for id {} for user {}", itemId, userId)
+                ));
     }
 
     @Transactional
-    public void removeFromCart(Long itemId){
-        log.info("removing position for id {}", itemId);
-        int res = cartRepo.removeItemFromCartByItemId(itemId);
-        if (res > 0) {
-            log.info("successfully removed position from cart for id {}", itemId);
-        } else {
-            log.warn("Positions for item id {} was not found for cart", itemId);
-        }
+    public Mono<Void> removeFromCart(Long itemId, Long userId) {
+        return cartRepo.removeItemFromCartByItemId(itemId, userId)
+                .doFirst(() -> log.info("removing position for id {} for user {}", itemId, userId))
+                .doOnNext(res -> {
+                    if (res > 0) {
+                        log.info("successfully removed position from cart for id {} for user {}", itemId, userId);
+                    } else {
+                        log.warn("Positions for item id {} for user {} was not found for cart", itemId, userId);
+                    }
+                }).then();
     }
 
-    public List<ItemDto>  getCartItems(){
-        List<ItemDto> dtos = new ArrayList<>();
-        for (CartPosition cp : cartRepo.findAll()){
-            var item = itemsRepo.getItemById(cp.getItem().getId()).orElseThrow( () -> new ItemNotFoundException("Item not found with id: " + cp.getItem().getId()));
-            dtos.add(itemMapper.toDto(item, cp.getCount()));
-        }
-        return dtos;
-    }
-
-    @Transactional
-    public void clearCart(){
-        cartRepo.clearCart();
+    public Flux<ItemDto> getCartItems(Long userId) {
+        return cartRepo.findByUserId(userId)
+                .flatMap(cp -> itemsRepo.getItemById(cp.getItemId())
+                        .switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found: " + cp.getItemId())))
+                        .map(item -> itemMapper.toDto(item, cp.getCount())));
     }
 }

@@ -2,15 +2,11 @@ spring:
   application:
     name: my-market-app
 
-  datasource:
-#    url: jdbc:postgresql://127.0.0.1:5432/p2
-    url: ${DATABASE_URL}
+  r2dbc:
+    url: ${R2DBC_DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-#server:
-#  port: 9090
+  liquibase:
+    url: ${JDBC_DATABASE_URL}
+    user: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
