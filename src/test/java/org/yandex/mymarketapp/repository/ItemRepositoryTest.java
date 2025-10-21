@@ -1,171 +1,216 @@
 package org.yandex.mymarketapp.repository;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.jdbc.Sql;
 import org.yandex.mymarketapp.model.domain.Item;
+import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.repo.ItemRepository;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
+import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Sql(scripts = "/sql/init-items.sql")
 class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
 
+    @BeforeEach
+    void beforeEach(){
+        this.executeSqlScript("sql/init-items.sql");
+    }
+
     @Test
     void getItemById_WhenItemExists_ShouldReturnItem() {
-        Optional<Item> foundItem = itemRepository.getItemById(1L);
+        Mono<Item> foundItem = itemRepository.getItemById(1L);
 
-        assertTrue(foundItem.isPresent());
-        Item item = foundItem.get();
-        assertEquals(1L, item.getId());
-        assertEquals("Test Item 1", item.getTitle());
-        assertEquals(50.0, item.getPrice());
+        StepVerifier.create(foundItem)
+                .expectNextMatches(item -> {
+                    assertEquals(1L, item.getId());
+                    assertEquals("Test Item 1", item.getTitle());
+                    assertEquals(50.0, item.getPrice());
+                    return true;
+                })
+                .verifyComplete();
     }
 
     @Test
-    void getItemById_WhenItemDoesNotExist_ShouldReturnEmptyOptional() {
-        Optional<Item> foundItem = itemRepository.getItemById(999L);
-        assertTrue(foundItem.isEmpty());
+    void getItemById_WhenItemDoesNotExist_ShouldReturnEmpty() {
+        Mono<Item> foundItem = itemRepository.getItemById(999L);
+
+        StepVerifier.create(foundItem)
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithNoSearchTermAndNoSort_ShouldReturnAllItems() {
-        Page<Item> itemsPage = itemRepository.findItems(null, "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithNoSearchTermAndNoSort_ShouldReturnAllItems() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertEquals(3, itemsPage.getContent().size());
-        assertEquals(3, itemsPage.getTotalElements());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithSearchTerm_ShouldReturnMatchingItems() {
-        Page<Item> itemsPage = itemRepository.findItems("Test", "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithSearchTerm_ShouldReturnMatchingItems() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("Test", "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertFalse(itemsPage.getContent().isEmpty());
-        assertTrue(itemsPage.getContent()
-                .stream()
-                .map(Item::getTitle)
-                .allMatch(title -> title.toLowerCase().contains("test")));
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertFalse(items.isEmpty());
+                    assertTrue(items.stream()
+                            .map(e -> e.title())
+                            .allMatch(title -> title.toLowerCase().contains("test")));
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithSearchTermInDescription_ShouldReturnMatchingItems() {
-        Page<Item> itemsPage = itemRepository.findItems("Description", "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithSearchTermInDescription_ShouldReturnMatchingItems() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("Description", "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertFalse(itemsPage.getContent().isEmpty());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertFalse(items.isEmpty());
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithNonMatchingSearchTerm_ShouldReturnEmptyPage() {
-        Page<Item> itemsPage = itemRepository.findItems("NonExistentItem", "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithNonMatchingSearchTerm_ShouldReturnEmpty() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("NonExistentItem", "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertTrue(itemsPage.getContent().isEmpty());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertTrue(items.isEmpty());
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithSortByPriceAsc_ShouldReturnItemsSortedByPrice() {
-        Page<Item> itemsPage = itemRepository.findItems(null, "PRICE", PageRequest.of(0, 10));
+    void findItemsWithCount_WithSortByPriceAsc_ShouldReturnItemsSortedByPrice() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "PRICE", 10, 0);
 
-        assertNotNull(itemsPage);
-        List<Item> items = itemsPage.getContent();
-        assertEquals(3, items.size());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
 
-        // Verify ascending price order
-        for (int i = 0; i < items.size() - 1; i++) {
-            assertTrue(items.get(i).getPrice() <= items.get(i + 1).getPrice());
-        }
+                    List<ItemDto> sortedItems = items.stream()
+                            .sorted(Comparator.comparingDouble(ItemDto::price))
+                            .toList();
+
+                    for (int i = 0; i < sortedItems.size() - 1; i++) {
+                        assertTrue(sortedItems.get(i).price() <= sortedItems.get(i + 1).price());
+                    }
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithSortByAlphaAsc_ShouldReturnItemsSortedByTitle() {
-        Page<Item> itemsPage = itemRepository.findItems(null, "ALPHA", PageRequest.of(0, 10));
+    void findItemsWithCount_WithSortByAlphaAsc_ShouldReturnItemsSortedByTitle() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "ALPHA", 10, 0);
 
-        assertNotNull(itemsPage);
-        List<Item> items = itemsPage.getContent();
-        assertEquals(3, items.size());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
 
-        // Verify ascending alphabetical order
-        for (int i = 0; i < items.size() - 1; i++) {
-            assertTrue(items.get(i).getTitle().compareTo(items.get(i + 1).getTitle()) <= 0);
-        }
+                    // Verify ascending alphabetical order
+                    List<ItemDto> sortedItems = items.stream()
+                            .sorted(Comparator.comparing(ItemDto::title))
+                            .toList();
+
+                    for (int i = 0; i < sortedItems.size() - 1; i++) {
+                        assertTrue(sortedItems.get(i).title().compareTo(sortedItems.get(i + 1).title()) <= 0);
+                    }
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithSortByNo_ShouldReturnItemsSortedById() {
-        Page<Item> itemsPage = itemRepository.findItems(null, "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithSortByNo_ShouldReturnItemsSortedById() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        List<Item> items = itemsPage.getContent();
-        assertEquals(3, items.size());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
 
-        // Verify ascending ID order
-        for (int i = 0; i < items.size() - 1; i++) {
-            assertTrue(items.get(i).getId() < items.get(i + 1).getId());
-        }
+                    // Verify ascending ID order
+                    List<ItemDto> sortedItems = items.stream()
+                            .sorted(Comparator.comparingLong(ItemDto::id))
+                            .toList();
+
+                    for (int i = 0; i < sortedItems.size() - 1; i++) {
+                        assertTrue(sortedItems.get(i).id() < sortedItems.get(i + 1).id());
+                    }
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithPagination_ShouldReturnCorrectPage() {
-        // Given - assuming we have 3 items total
-        int pageSize = 2;
+    void findItemsWithCount_WithPagination_ShouldReturnCorrectPage() {
+        int limit = 2;
 
-        // When - first page
-        Page<Item> firstPage = itemRepository.findItems(null, "NO", PageRequest.of(0, pageSize));
+        // First page
+        Flux<ItemDto> firstPageFlux = itemRepository.findItemsWithCount(null, "NO", limit, 0);
 
-        // Then
-        assertNotNull(firstPage);
-        assertEquals(2, firstPage.getContent().size());
-        assertEquals(2, firstPage.getTotalPages());
-        assertEquals(3, firstPage.getTotalElements());
-        assertTrue(firstPage.isFirst());
-        assertFalse(firstPage.isLast());
+        StepVerifier.create(firstPageFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(limit, items.size());
+                })
+                .verifyComplete();
 
-        // When - second page
-        Page<Item> secondPage = itemRepository.findItems(null, "NO", PageRequest.of(1, pageSize));
+        // Second page
+        Flux<ItemDto> secondPageFlux = itemRepository.findItemsWithCount(null, "NO", limit, limit);
 
-        // Then
-        assertNotNull(secondPage);
-        assertEquals(1, secondPage.getContent().size());
-        assertFalse(secondPage.isFirst());
-        assertTrue(secondPage.isLast());
+        StepVerifier.create(secondPageFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(1, items.size()); // Only 1 item left for second page
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithEmptySearchTerm_ShouldReturnAllItems() {
-        Page<Item> itemsPage = itemRepository.findItems("", "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithEmptySearchTerm_ShouldReturnAllItems() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("", "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertEquals(3, itemsPage.getContent().size());
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findItems_WithCaseInsensitiveSearch_ShouldReturnMatchingItems() {
-        Page<Item> itemsPage = itemRepository.findItems("TEST", "NO", PageRequest.of(0, 10));
+    void findItemsWithCount_WithCaseInsensitiveSearch_ShouldReturnMatchingItems() {
+        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("TEST", "NO", 10, 0);
 
-        assertNotNull(itemsPage);
-        assertFalse(itemsPage.getContent().isEmpty());
-        assertTrue(itemsPage.getContent()
-                .stream()
-                .map(Item::getTitle)
-                .allMatch(title -> title.toLowerCase().contains("test")));
+        StepVerifier.create(itemsFlux.collectList())
+                .assertNext(items -> {
+                    assertFalse(items.isEmpty());
+                    assertTrue(items.stream()
+                            .map(ItemDto::title)
+                            .allMatch(title -> title.toLowerCase().contains("test")));
+                })
+                .verifyComplete();
     }
 
     @Test
     void getTotalItemsCount_ShouldReturnCorrectCount() {
-        int totalCount = itemRepository.getTotalItemsCount();
+        Mono<Integer> totalCount = itemRepository.getTotalItemsCount();
 
-        assertEquals(3, totalCount); // Assuming 3 items in init.sql
+        StepVerifier.create(totalCount)
+                .expectNext(3) // Assuming 3 items in init.sql
+                .verifyComplete();
     }
 
     @Test
@@ -178,31 +223,38 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
         newItem.setPrice(99.99);
 
         // When
-        Item savedItem = itemRepository.save(newItem);
+        Mono<Item> savedItem = itemRepository.save(newItem);
 
         // Then
-        assertNotNull(savedItem.getId());
-
-        Optional<Item> retrievedItem = itemRepository.getItemById(savedItem.getId());
-        assertTrue(retrievedItem.isPresent());
-        assertEquals("New Test Item", retrievedItem.get().getTitle());
-        assertEquals(99.99, retrievedItem.get().getPrice());
+        StepVerifier.create(savedItem)
+                .assertNext(item -> {
+                    assertNotNull(item.getId());
+                    assertEquals("New Test Item", item.getTitle());
+                    assertEquals(99.99, item.getPrice());
+                })
+                .verifyComplete();
     }
 
     @Test
     void update_ShouldModifyExistingItem() {
         // Given
-        Item existingItem = itemRepository.getItemById(1L).orElseThrow();
-        existingItem.setTitle("Updated Title");
-        existingItem.setPrice(75.0);
+        Mono<Item> existingItemMono = itemRepository.getItemById(1L)
+                .doOnNext(item -> {
+                    item.setTitle("Updated Title");
+                    item.setPrice(75.0);
+                });
 
         // When
-        Item updatedItem = itemRepository.save(existingItem);
+        Mono<Item> updateOperation = existingItemMono.flatMap(itemRepository::save);
 
         // Then
-        assertEquals(1L, updatedItem.getId());
-        assertEquals("Updated Title", updatedItem.getTitle());
-        assertEquals(75.0, updatedItem.getPrice());
+        StepVerifier.create(updateOperation)
+                .assertNext(updatedItem -> {
+                    assertEquals(1L, updatedItem.getId());
+                    assertEquals("Updated Title", updatedItem.getTitle());
+                    assertEquals(75.0, updatedItem.getPrice());
+                })
+                .verifyComplete();
     }
 
     @Test
@@ -211,10 +263,25 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
         Long itemId = 1L;
 
         // When
-        itemRepository.deleteById(itemId);
+        Mono<Void> deleteOperation = itemRepository.deleteById(itemId);
 
         // Then
-        Optional<Item> deletedItem = itemRepository.getItemById(itemId);
-        assertTrue(deletedItem.isEmpty());
+        StepVerifier.create(deleteOperation)
+                .verifyComplete();
+
+        // Verify item is gone
+        StepVerifier.create(itemRepository.getItemById(itemId))
+                .verifyComplete();
+    }
+
+    @Test
+    void findAll_ShouldReturnAllItems() {
+        Flux<Item> allItems = itemRepository.findAll();
+
+        StepVerifier.create(allItems.collectList())
+                .assertNext(items -> {
+                    assertEquals(3, items.size());
+                })
+                .verifyComplete();
     }
 }

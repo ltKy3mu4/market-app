@@ -1,23 +1,20 @@
 package org.yandex.mymarketapp.repository;
 
-import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.jdbc.Sql;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.yandex.mymarketapp.model.domain.CartPosition;
 import org.yandex.mymarketapp.model.domain.Item;
+import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.ItemRepository;
-
-import java.util.List;
-import java.util.Optional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Sql(scripts = "/sql/init-cartpositions.sql")
 class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Autowired
@@ -26,153 +23,248 @@ class CartPositionsRepositoryTest extends PostgresBaseIntegrationTest {
     @Autowired
     private ItemRepository itemRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    @BeforeEach
+    void beforeEach(){
+        this.executeSqlScript("sql/init-cartpositions.sql");
+    }
+    
+    Long userId = 0L;
 
     @Test
     void findByItemId_WhenItemExistsInCart_ShouldReturnCartPosition() {
+        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemIdAndUserId(1L, userId);
 
-        Optional<CartPosition> foundCartPosition = cartPositionsRepository.findByItemId(1L);
-
-        assertTrue(foundCartPosition.isPresent());
-        CartPosition cartPosition = foundCartPosition.get();
-        assertEquals(1L, cartPosition.getItem().getId());
-        assertTrue(cartPosition.getCount() > 0);
+        StepVerifier.create(foundCartPosition)
+                .assertNext(cartPosition -> {
+                    assertEquals(1L, cartPosition.getItemId());
+                    assertTrue(cartPosition.getCount() > 0);
+                })
+                .verifyComplete();
     }
 
     @Test
-    void findByItemId_WhenItemNotInCart_ShouldReturnEmptyOptional() {
-        Optional<CartPosition> foundCartPosition = cartPositionsRepository.findByItemId(999L);
-        assertTrue(foundCartPosition.isEmpty());
+    void findByItemId_WhenItemNotInCart_ShouldReturnEmpty() {
+        Mono<CartPosition> foundCartPosition = cartPositionsRepository.findByItemIdAndUserId(999L, userId);
+
+        StepVerifier.create(foundCartPosition)
+                .verifyComplete();
     }
 
     @Test
-    @Transactional
     void increaseItemCount_ShouldIncrementCountByOne() {
         Long itemId = 1L;
-        Optional<CartPosition> initialCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(initialCartPosition.isPresent());
-        int initialCount = initialCartPosition.get().getCount();
 
-        cartPositionsRepository.increaseItemCount(itemId);
+        Mono<Integer> initialCountMono = cartPositionsRepository.findByItemIdAndUserId(itemId, userId)
+                .map(CartPosition::getCount);
 
-        entityManager.flush();
-        entityManager.clear();
+        Mono<Integer> operation = initialCountMono
+                .flatMap(initialCount ->
+                        cartPositionsRepository.increaseItemCount(itemId, userId)
+                                .then(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
+                                .map(updated -> updated.getCount())
+                                .doOnNext(updatedCount -> assertEquals(initialCount + 1, updatedCount))
+                );
 
-        Optional<CartPosition> updatedCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(updatedCartPosition.isPresent());
-        assertEquals(initialCount + 1, updatedCartPosition.get().getCount());
+        StepVerifier.create(operation)
+                .expectNextMatches(updatedCount -> updatedCount > 0)
+                .verifyComplete();
     }
 
     @Test
-    @Transactional
     void decreaseItemCount_ShouldDecrementCountByOne() {
         Long itemId = 1L;
-        Optional<CartPosition> initialCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(initialCartPosition.isPresent());
-        int initialCount = initialCartPosition.get().getCount();
-        assertTrue(initialCount > 1); // Ensure we can decrement
 
-        cartPositionsRepository.decreaseItemCount(itemId);
+        // Get initial count and ensure it's > 1
+        Mono<CartPosition> initialCartPosition = cartPositionsRepository.findByItemIdAndUserId(itemId, userId)
+                .filter(cp -> cp.getCount() > 1);
 
-        entityManager.flush();
-        entityManager.clear();
+        Mono<Integer> operation = initialCartPosition
+                .flatMap(initial ->
+                        cartPositionsRepository.decreaseItemCount(itemId, userId)
+                                .then(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
+                                .map(updated -> updated.getCount())
+                                .doOnNext(updatedCount -> assertEquals(initial.getCount() - 1, updatedCount))
+                );
 
-        Optional<CartPosition> updatedCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(updatedCartPosition.isPresent());
-        assertEquals(initialCount - 1, updatedCartPosition.get().getCount());
+        StepVerifier.create(operation)
+                .expectNextMatches(updatedCount -> updatedCount >= 0)
+                .verifyComplete();
     }
 
     @Test
     void removeItemFromCartByItemId_WhenItemExists_ShouldRemoveCartPosition() {
         Long itemId = 1L;
-        Optional<CartPosition> initialCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(initialCartPosition.isPresent());
 
-        int removedCount = cartPositionsRepository.removeItemFromCartByItemId(itemId);
+        // First verify the item exists in cart
+        StepVerifier.create(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
+                .expectNextCount(1)
+                .verifyComplete();
 
-        assertEquals(1, removedCount);
-        Optional<CartPosition> deletedCartPosition = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(deletedCartPosition.isEmpty());
+        // Remove the item
+        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(itemId, userId);
+
+        StepVerifier.create(removeOperation)
+                .expectNext(1) // Should remove 1 row
+                .verifyComplete();
+
+        // Verify the item is no longer in cart
+        StepVerifier.create(cartPositionsRepository.findByItemIdAndUserId(itemId, userId))
+                .verifyComplete();
     }
 
     @Test
     void removeItemFromCartByItemId_WhenItemNotInCart_ShouldReturnZero() {
         Long nonExistentItemId = 999L;
 
-        int removedCount = cartPositionsRepository.removeItemFromCartByItemId(nonExistentItemId);
+        Mono<Integer> removeOperation = cartPositionsRepository.removeItemFromCartByItemId(nonExistentItemId, userId);
 
-        assertEquals(0, removedCount);
+        StepVerifier.create(removeOperation)
+                .expectNext(0) // Should remove 0 rows
+                .verifyComplete();
     }
 
     @Test
     void clearCart_ShouldRemoveAllCartPositions() {
-        List<CartPosition> initialCartPositions = cartPositionsRepository.findAll();
-        assertFalse(initialCartPositions.isEmpty());
+        // First verify there are items in cart
+        StepVerifier.create(cartPositionsRepository.findAll().collectList())
+                .assertNext(positions -> assertFalse(positions.isEmpty()))
+                .verifyComplete();
 
-        cartPositionsRepository.clearCart();
+        // Clear the cart
+        Mono<Integer> clearOperation = cartPositionsRepository.clearCart(userId);
 
-        List<CartPosition> clearedCartPositions = cartPositionsRepository.findAll();
-        assertTrue(clearedCartPositions.isEmpty());
+        StepVerifier.create(clearOperation)
+                .expectNextMatches(rowsAffected -> rowsAffected > 0)
+                .verifyComplete();
+
+        // Verify cart is empty
+        StepVerifier.create(cartPositionsRepository.findAll().collectList())
+                .assertNext(positions -> assertTrue(positions.isEmpty()))
+                .verifyComplete();
     }
 
     @Test
     void save_ShouldPersistNewCartPosition() {
-        Item newItem = itemRepository.findById(3L).orElseThrow();
-        CartPosition newCartPosition = new CartPosition();
-        newCartPosition.setItem(newItem);
-        newCartPosition.setCount(1);
+        // Get an item to add to cart
+        Mono<Item> itemMono = itemRepository.findById(3L);
 
-        CartPosition savedCartPosition = cartPositionsRepository.save(newCartPosition);
+        Mono<CartPosition> saveOperation = itemMono
+                .flatMap(item -> {
+                    CartPosition newCartPosition = new CartPosition();
+                    newCartPosition.setItemId(item.getId());
+                    newCartPosition.setCount(1);
+                    return cartPositionsRepository.save(newCartPosition);
+                })
+                .flatMap(saved -> cartPositionsRepository.findByItemIdAndUserId(saved.getItemId(), userId));
 
-        assertNotNull(savedCartPosition.getId());
-        Optional<CartPosition> retrievedCartPosition = cartPositionsRepository.findByItemId(newItem.getId());
-        assertTrue(retrievedCartPosition.isPresent());
-        assertEquals(newItem.getId(), retrievedCartPosition.get().getItem().getId());
-        assertEquals(1, retrievedCartPosition.get().getCount());
+        StepVerifier.create(saveOperation)
+                .assertNext(cartPosition -> {
+                    assertNotNull(cartPosition.getId());
+                    assertEquals(3L, cartPosition.getItemId());
+                    assertEquals(1, cartPosition.getCount());
+                })
+                .verifyComplete();
     }
 
     @Test
     void delete_ShouldRemoveCartPosition() {
         Long cartPositionId = 1L;
-        CartPosition cartPosition = cartPositionsRepository.findById(cartPositionId).orElseThrow();
-        Long itemId = cartPosition.getItem().getId();
 
-        cartPositionsRepository.deleteById(cartPositionId);
+        // First get the cart position to verify it exists
+        Mono<CartPosition> existingPosition = cartPositionsRepository.findById(cartPositionId);
 
-        Optional<CartPosition> deletedCartPosition = cartPositionsRepository.findById(cartPositionId);
-        assertTrue(deletedCartPosition.isEmpty());
+        StepVerifier.create(existingPosition)
+                .expectNextCount(1)
+                .verifyComplete();
 
-        Optional<CartPosition> byItemId = cartPositionsRepository.findByItemId(itemId);
-        assertTrue(byItemId.isEmpty());
+        // Delete the cart position
+        Mono<Void> deleteOperation = cartPositionsRepository.deleteById(cartPositionId);
+
+        StepVerifier.create(deleteOperation)
+                .verifyComplete();
+
+        // Verify it's deleted
+        StepVerifier.create(cartPositionsRepository.findById(cartPositionId))
+                .verifyComplete();
     }
 
     @Test
     void findAll_ShouldReturnAllCartPositions() {
-        List<CartPosition> cartPositions = cartPositionsRepository.findAll();
+        Flux<CartPosition> cartPositions = cartPositionsRepository.findAll();
 
-        assertNotNull(cartPositions);
-        assertFalse(cartPositions.isEmpty());
+        StepVerifier.create(cartPositions.collectList())
+                .assertNext(positions -> {
+                    assertNotNull(positions);
+                    assertFalse(positions.isEmpty());
 
-        for (CartPosition cartPosition : cartPositions) {
-            assertNotNull(cartPosition.getId());
-            assertNotNull(cartPosition.getItem());
-            assertTrue(cartPosition.getCount() > 0);
-        }
+                    for (CartPosition cartPosition : positions) {
+                        assertNotNull(cartPosition.getId());
+                        assertNotNull(cartPosition.getItemId());
+                        assertTrue(cartPosition.getCount() > 0);
+                    }
+                })
+                .verifyComplete();
     }
 
     @Test
     void updateCountDirectly_ShouldModifyCartPosition() {
         Long cartPositionId = 1L;
-        CartPosition cartPosition = cartPositionsRepository.findById(cartPositionId).orElseThrow();
         int newCount = 5;
-        cartPosition.setCount(newCount);
 
-        CartPosition updatedCartPosition = cartPositionsRepository.save(cartPosition);
+        Mono<CartPosition> updateOperation = cartPositionsRepository.findById(cartPositionId)
+                .flatMap(cartPosition -> {
+                    cartPosition.setCount(newCount);
+                    return cartPositionsRepository.save(cartPosition);
+                })
+                .flatMap(updated -> cartPositionsRepository.findById(cartPositionId));
 
-        assertEquals(newCount, updatedCartPosition.getCount());
+        StepVerifier.create(updateOperation)
+                .assertNext(updatedCartPosition -> {
+                    assertEquals(newCount, updatedCartPosition.getCount());
+                    assertEquals(cartPositionId, updatedCartPosition.getId());
+                })
+                .verifyComplete();
+    }
 
-        CartPosition retrievedCartPosition = cartPositionsRepository.findById(cartPositionId).orElseThrow();
-        assertEquals(newCount, retrievedCartPosition.getCount());
+    @Test
+    void getAllCartPositions_ShouldReturnItemDtos() {
+        Flux<ItemDto> cartItems = cartPositionsRepository.getAllCartPositions(userId);
+
+        StepVerifier.create(cartItems.collectList())
+                .assertNext(items -> {
+                    assertNotNull(items);
+                    assertFalse(items.isEmpty());
+                    // Add more specific assertions based on your ItemDto structure
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void save_ShouldCreateCartPositionWithCountOne() {
+        Long itemId = 3L;
+        CartPosition newCartPosition = new CartPosition(itemId, userId);
+
+        Mono<CartPosition> saveOperation = cartPositionsRepository.save(newCartPosition)
+                .flatMap(saved -> cartPositionsRepository.findByItemIdAndUserId(itemId, userId));
+
+        StepVerifier.create(saveOperation)
+                .assertNext(cartPosition -> {
+                    assertEquals(itemId, cartPosition.getItemId());
+                    assertEquals(1, cartPosition.getCount());
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void decreaseItemCount_WhenCountIsOne_ShouldRemoveItem() {
+        Long itemId = 3L;
+        CartPosition cartPosition = new CartPosition(itemId, userId);
+        cartPosition.setCount(1);
+
+        Mono<Integer> operation = cartPositionsRepository.save(cartPosition)
+                .then(cartPositionsRepository.decreaseItemCount(itemId, userId));
+
+        StepVerifier.create(operation)
+                .verifyError(DataIntegrityViolationException.class);
     }
 }

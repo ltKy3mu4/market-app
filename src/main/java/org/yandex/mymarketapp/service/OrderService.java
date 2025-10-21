@@ -1,41 +1,51 @@
 package org.yandex.mymarketapp.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.Order;
-import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.dto.OrderDto;
 import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.model.mapper.OrderMapper;
+import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.OrderRepository;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.List;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepo;
+    private final CartPositionsRepository cartRepo;
     private final OrderMapper orderMapper;
 
     @Transactional
-    public void makeOrder(List<ItemDto> items) {
-        Order order = new Order();
-        var orderItems = orderMapper.toEntities(items);
-        orderItems.forEach(e-> e.setOrder(order));
-        order.setItems(orderItems);
-        order.setTotalSum(orderItems.stream().mapToDouble(e -> e.getPrice()*e.getCount()).sum());
-        orderRepo.save(order);
+    public Mono<Void> makeOrder(Long userId) {
+        log.info("Making order");
+        return cartRepo.getAllCartPositions(userId)
+                .collectList()
+                .flatMap(items -> {
+                    Order order = new Order();
+                    var orderItems = orderMapper.toEntities(items);
+                    order.setItems(orderItems);
+                    order.setTotalSum(orderItems.stream().mapToDouble(e -> e.getPrice()*e.getCount()).sum());
+                    return orderRepo.save(order);
+                })
+                .flatMap(o -> cartRepo.clearCart(userId))
+                .then();
     }
 
-    public List<OrderDto> getAllOrders() {
-        List<Order> orders = orderRepo.getAllWithPositions();
-        return orderMapper.toDtos(orders);
+    public Flux<OrderDto> getAllOrders(Long userId) {
+        return orderRepo.getAllWithPositions(userId)
+                .map(orderMapper::toDto);
     }
 
-    public OrderDto getOrderById(Long orderId) {
-        return orderMapper.toDto(orderRepo.getByIdWithPositions(orderId).orElseThrow(() -> new OrderNotFoundException("order with id " + orderId + " not found!")));
+    public Mono<OrderDto> getOrderById(Long id, Long userId) {
+        return orderRepo.getByIdAndUserIdWithPositions(id, userId)
+                .switchIfEmpty(Mono.error(() -> new OrderNotFoundException("order with id " + id + " not found!")))
+                .map(orderMapper::toDto);
     }
-
 }
