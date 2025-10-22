@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: my-market-app
 
@@ -10,3 +13,10 @@ spring:
     url: ${JDBC_DATABASE_URL}
     user: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+  cache:
+    redis:
+      time-to-live: PT1M    # TTL по умолчанию для кеше
