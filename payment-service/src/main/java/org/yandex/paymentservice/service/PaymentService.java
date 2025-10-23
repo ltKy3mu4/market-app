@@ -17,7 +17,7 @@ public class PaymentService {
     private final Map<Long, UserBalance> userBalances = new ConcurrentHashMap<>();
 
     public UserBalance getBalance(Long userId) {
-        userBalances.computeIfAbsent(userId, k -> new UserBalance(userId, 5000.0f));
+        userBalances.computeIfAbsent(userId, k -> new UserBalance(userId, 500.0f));
         return userBalances.get(userId);
     }
 
