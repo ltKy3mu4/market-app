@@ -18,7 +18,7 @@ public class Order {
     private Long id;
     @Column
     @Min(value = 0)
-    private double totalSum;
+    private Double totalSum;
 
     @Column
     private Long userId;

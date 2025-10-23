@@ -1,10 +1,13 @@
 package org.yandex.mymarketapp.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.yandex.mymarketapp.model.dto.BalanceDto;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.OrderService;
 import reactor.core.publisher.Mono;
@@ -21,9 +24,11 @@ public class CartController {
     public Mono<String> showCart(Model model, @RequestParam(defaultValue = "0") Long userId) {
         return cartService.getCartItems(userId)
                 .collectList()
-                .doOnNext(items -> {
-                    model.addAttribute("items", items);
-                    double totalPrice =  items.stream().mapToDouble(e-> e.price()*e.count()).sum();
+                .flatMap( items -> Mono.zip(Mono.just(items), cartService.isMoneyEnoughToBuy(userId)))
+                .doOnNext(tuple -> {
+                    model.addAttribute("items", tuple.getT1());
+                    model.addAttribute("moneyEnough", tuple.getT2());
+                    double totalPrice =  tuple.getT1().stream().mapToDouble(e-> e.price()*e.count()).sum();
                     model.addAttribute("total", totalPrice);
                 }).thenReturn("cart");
     }
@@ -52,6 +57,11 @@ public class CartController {
     public Mono<String> buyItems(@RequestParam(defaultValue = "0") Long userId) {
         return orderService.makeOrder(userId).thenReturn("redirect:/orders");
     }
+
+//    @GetMapping("/money-is-enough")
+//    public Mono<ResponseEntity<Boolean>> isMoneyEnoughToBuy(@RequestParam(defaultValue = "0") Long userId) {
+//        return cartService.isMoneyEnoughToBuy(userId).map(ResponseEntity::ok);
+//    }
 
     public record CartBuyForm(Long id, String action){};
 }

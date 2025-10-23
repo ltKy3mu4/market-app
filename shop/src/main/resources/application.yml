@@ -20,3 +20,7 @@ spring:
   cache:
     redis:
       time-to-live: PT1M    # TTL по умолчанию для кеше
+
+payment:
+  service:
+    url: ${PAYMENT_API_URL}

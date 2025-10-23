@@ -70,12 +70,18 @@
         </div>
         <div class="row p-2">
             <div class="col">
-                <form action="/cart/buy" method="post" th:if="${!items.isEmpty()}">
+                <form action="/cart/buy" method="post"
+                      th:if="${!items.isEmpty() and moneyEnough}">
                     <div class="hstack gap-3">
-                        <h2 th:text="'Итого: '+${total}+' руб.'"/>
+                        <h2 th:text="'Итого: ' + ${total} + ' руб.'"></h2>
                         <button class="btn btn-warning ms-auto">Купить</button>
                     </div>
                 </form>
+
+                <!-- Optional: show a warning if not enough money -->
+                <div th:if="${!moneyEnough}" class="alert alert-danger mt-2">
+                    Недостаточно средств для покупки.
+                </div>
             </div>
         </div>
     </div>

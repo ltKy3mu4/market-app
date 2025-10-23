@@ -10,6 +10,7 @@ import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.model.mapper.OrderMapper;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.OrderRepository;
+import org.yandex.payment.model.PaymentRequest;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -21,6 +22,7 @@ public class OrderService {
     private final OrderRepository orderRepo;
     private final CartPositionsRepository cartRepo;
     private final OrderMapper orderMapper;
+    private final org.yandex.payment.api.PaymentsApi payApi;
 
     @Transactional
     public Mono<Void> makeOrder(Long userId) {
@@ -34,6 +36,9 @@ public class OrderService {
                     order.setTotalSum(orderItems.stream().mapToDouble(e -> e.getPrice()*e.getCount()).sum());
                     return orderRepo.save(order);
                 })
+                .flatMap(o -> payApi.processPayment(userId, new PaymentRequest().amount(o.getTotalSum().floatValue())))
+                .doOnError(throwable -> log.error("Failed to pay order", throwable))
+                .doOnNext(b -> log.info("Payment processed for user {}, balance {}", userId, b.getBalance()))
                 .flatMap(o -> cartRepo.clearCart(userId))
                 .then();
     }

@@ -22,6 +22,7 @@ public class CartService {
     private final ItemRepository itemsRepo;
     private final CartPositionsRepository cartRepo;
     private final ItemMapper itemMapper;
+    private final org.yandex.payment.api.BalanceApi balanceApi;
 
     @Transactional
     public Mono<Void> increaseQuantityInCart(Long itemId, Long userId) {
@@ -76,5 +77,17 @@ public class CartService {
                 .flatMap(cp -> itemsRepo.getItemById(cp.getItemId())
                         .switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found: " + cp.getItemId())))
                         .map(item -> itemMapper.toDto(item, cp.getCount())));
+    }
+
+    public Mono<Boolean> isMoneyEnoughToBuy(Long userId) {
+        return this.getCartItems(userId)
+                .collectList()
+                .map(items -> items.stream().mapToDouble(e->e.count()*e.price()).sum())
+                .flatMap(price -> Mono.zip(Mono.just(price), balanceApi.getUserBalance(userId)))
+                .flatMap(tuple -> {
+                    Double totalPrice = tuple.getT1();
+                    Float userBalance = tuple.getT2().getBalance();
+                    return Mono.just(userBalance >= totalPrice);
+                });
     }
 }
