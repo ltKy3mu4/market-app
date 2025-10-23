@@ -10,6 +10,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
+    <properties>
+        <openapi-generator.version>7.8.0</openapi-generator.version>
+    </properties>
+
     <groupId>org.yandex</groupId>
     <artifactId>my-market-app</artifactId>
     <version>0.0.1</version>
@@ -18,5 +22,19 @@
     <modules>
         <module>api-spec</module>
         <module>shop</module>
+        <module>payment-service</module>
     </modules>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.openapitools</groupId>
+                    <artifactId>openapi-generator-maven-plugin</artifactId>
+                    <version>${openapi-generator.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
 </project>
