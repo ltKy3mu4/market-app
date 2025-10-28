@@ -17,7 +17,7 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-      username: ${REDIS_USER:redis}
+#      username: ${REDIS_USER:redis}
       password: ${REDIS_USER_PASSWORD:redispass}
   cache:
     redis:
