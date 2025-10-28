@@ -11,38 +11,4 @@
     <artifactId>api-spec</artifactId>
     <version>0.0.1</version>
     <name>api-spec</name>
-
-<!--    <build>-->
-<!--        <plugins>-->
-<!--            <plugin>-->
-<!--                <groupId>org.openapitools</groupId>-->
-<!--                <artifactId>openapi-generator-maven-plugin</artifactId>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <id>generate-payment-client</id>-->
-<!--                        <goals>-->
-<!--                            <goal>generate</goal>-->
-<!--                        </goals>-->
-<!--                        <configuration>-->
-<!--                            <inputSpec>${project.basedir}/src/main/resources/payment-service.yaml</inputSpec>-->
-<!--                            <generatorName>java</generatorName>-->
-<!--                            <library>webclient</library>-->
-<!--                            <output>${project.build.directory}/generated-sources</output>-->
-<!--                            <apiPackage>org.yandex.payment.api</apiPackage>-->
-<!--                            <modelPackage>org.yandex.payment.model</modelPackage>-->
-<!--                            <invokerPackage>org.yandex.payment.invoker</invokerPackage>-->
-<!--                            <configOptions>-->
-<!--                                <reactive>true</reactive>-->
-<!--                                <useSpringBoot3>true</useSpringBoot3>-->
-<!--                                <openApiNullable>false</openApiNullable>-->
-<!--                                <interfaceOnly>true</interfaceOnly>-->
-<!--                                <skipDefaultInterface>true</skipDefaultInterface>-->
-<!--                                <useBeanValidation>true</useBeanValidation>-->
-<!--                            </configOptions>-->
-<!--                        </configuration>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--            </plugin>-->
-<!--        </plugins>-->
-<!--    </build>-->
 </project>
