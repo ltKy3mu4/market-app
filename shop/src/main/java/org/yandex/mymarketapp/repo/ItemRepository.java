@@ -15,8 +15,7 @@ public interface ItemRepository extends R2dbcRepository<Item, Long> {
     Mono<Item> getItemById(Long id);
 
     @Query("""
-        SELECT i.*, cp.count FROM items i
-        LEFT JOIN cart_positions cp on i.id = cp.item_id
+        SELECT i.* FROM items i
         WHERE (:searchTerm IS NULL OR
                LOWER(i.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR
                LOWER(i.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))
@@ -26,14 +25,7 @@ public interface ItemRepository extends R2dbcRepository<Item, Long> {
             CASE WHEN :sortBy = 'PRICE' THEN i.price END ASC
         LIMIT :limit OFFSET :offset
         """)
-    Flux<ItemDto> findItemsWithCount(@Param("searchTerm") String searchTerm, @Param("sortBy") String sortBy, Integer limit, Integer offset);
-
-    @Query("""
-        SELECT i.*, cp.count FROM items i
-        LEFT JOIN cart_positions cp on i.id = cp.item_id
-        where i.id = :id
-        """)
-    Mono<ItemDto> findItemByIdWithCount(@Param("id") long id);
+    Flux<Item> findItems(@Param("searchTerm") String searchTerm, @Param("sortBy") String sortBy, Integer limit, Integer offset);
 
     @Query("SELECT COUNT(*) FROM items")
     Mono<Integer> getTotalItemsCount();

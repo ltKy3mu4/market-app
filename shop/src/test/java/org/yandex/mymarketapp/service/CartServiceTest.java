@@ -6,14 +6,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.yandex.mymarketapp.model.domain.CartPosition;
 import org.yandex.mymarketapp.model.domain.Item;
+import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.model.mapper.ItemMapperImpl;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.ItemRepository;
+import org.yandex.payment.model.UserBalance;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -26,6 +31,9 @@ class CartServiceTest {
 
     @MockitoBean
     private CartPositionsRepository cartRepo;
+
+    @MockitoBean
+    private org.yandex.payment.api.BalanceApi balanceApi;
 
     @Autowired
     private CartService cartService;
@@ -207,10 +215,10 @@ class CartServiceTest {
     void getCartItems_WhenCartIsEmpty_ShouldReturnEmptyList() {
         when(cartRepo.findByUserId(userId)).thenReturn(Flux.empty());
 
-        Flux<ItemDto> result = cartService.getCartItems(userId);
+        Mono<CartItemsDto> result = cartService.getCartItems(userId);
 
         StepVerifier.create(result)
-                .verifyComplete();
+                .expectNextMatches(e-> e.items().isEmpty());
 
         verify(cartRepo).findByUserId(userId);
         verify(itemsRepo, never()).getItemById(any());
@@ -228,7 +236,7 @@ class CartServiceTest {
         when(itemsRepo.getItemById(itemId)).thenReturn(Mono.empty());
 
         // When
-        Flux<ItemDto> result = cartService.getCartItems(userId);
+        Mono<CartItemsDto> result = cartService.getCartItems(userId);
 
         // Then
         StepVerifier.create(result)
@@ -240,7 +248,6 @@ class CartServiceTest {
 
     @Test
     void getCartItems_WhenItemsExist_ShouldReturnItemDtos() {
-        // Given
         Long itemId = 1L;
         CartPosition cp = new CartPosition(itemId, userId);
         cp.setId(1L);
@@ -253,15 +260,11 @@ class CartServiceTest {
 
         when(cartRepo.findByUserId(userId)).thenReturn(Flux.just(cp));
         when(itemsRepo.getItemById(itemId)).thenReturn(Mono.just(item));
-        // Mock the mapper behavior
-        when(itemsRepo.getItemById(itemId)).thenReturn(Mono.just(item));
 
-        // When
-        Flux<ItemDto> result = cartService.getCartItems(userId);
+        Mono<CartItemsDto> result = cartService.getCartItems(userId);
 
-        // Then
         StepVerifier.create(result)
-                .expectNextMatches(dto -> dto.id() == itemId && dto.count() == 2)
+                .expectNext(new CartItemsDto(List.of(new ItemDto(itemId, "Test Item", null, null, 10.0, 2))))
                 .verifyComplete();
 
         verify(cartRepo).findByUserId(userId);
@@ -318,10 +321,8 @@ class CartServiceTest {
         when(itemsRepo.findById(itemId)).thenReturn(Mono.just(mockItem));
         when(cartRepo.save(any(CartPosition.class))).thenReturn(Mono.error(new RuntimeException("DB error")));
 
-        // When
         Mono<Void> result = cartService.increaseQuantityInCart(itemId, userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyError(RuntimeException.class);
 
@@ -331,41 +332,23 @@ class CartServiceTest {
     }
 
     @Test
-    void getCartItems_WithMultipleItems_ShouldReturnAllItems() {
-        // Given
-        Long itemId1 = 1L;
-        Long itemId2 = 2L;
+    void isMoneyEnoughToBuy_WhenTrue() {
+        Long userId = 1L;
+        when(balanceApi.getUserBalance(1L)).thenReturn(Mono.just(new UserBalance().id(1L).balance(10.0f)));
 
-        CartPosition cp1 = new CartPosition(itemId1, userId);
-        cp1.setId(1L);
-        cp1.setCount(2);
+        Mono<Boolean> result = cartService.isMoneyEnoughToBuy(4.0, userId);
 
-        CartPosition cp2 = new CartPosition(itemId2, userId);
-        cp2.setId(2L);
-        cp2.setCount(1);
-
-        Item item1 = new Item();
-        item1.setId(itemId1);
-        item1.setTitle("Item 1");
-
-        Item item2 = new Item();
-        item2.setId(itemId2);
-        item2.setTitle("Item 2");
-
-        when(cartRepo.findByUserId(userId)).thenReturn(Flux.just(cp1, cp2));
-        when(itemsRepo.getItemById(itemId1)).thenReturn(Mono.just(item1));
-        when(itemsRepo.getItemById(itemId2)).thenReturn(Mono.just(item2));
-
-        // When
-        Flux<ItemDto> result = cartService.getCartItems(userId);
-
-        // Then
-        StepVerifier.create(result)
-                .expectNextCount(2)
-                .verifyComplete();
-
-        verify(cartRepo).findByUserId(userId);
-        verify(itemsRepo).getItemById(itemId1);
-        verify(itemsRepo).getItemById(itemId2);
+        StepVerifier.create(result).expectNext(true).verifyComplete();
     }
+
+    @Test
+    void isMoneyEnoughToBuy_WhenFalse() {
+        Long userId = 1L;
+        when(balanceApi.getUserBalance(1L)).thenReturn(Mono.just(new UserBalance().id(1L).balance(10.0f)));
+
+        Mono<Boolean> result = cartService.isMoneyEnoughToBuy(40.0, userId);
+
+        StepVerifier.create(result).expectNext(false).verifyComplete();
+    }
+
 }

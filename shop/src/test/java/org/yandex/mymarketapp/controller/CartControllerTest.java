@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.reactive.function.BodyInserters;
+import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.OrderService;
@@ -16,10 +16,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @WebFluxTest(CartController.class)
@@ -42,7 +40,8 @@ class CartControllerTest {
                 new ItemDto(2L, "Item 2", "Description 2", "/img2.jpg", 15.0, 1)
         );
 
-        when(cartService.getCartItems(any())).thenReturn(Flux.fromIterable(mockCartItems));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(mockCartItems)));
+        when(cartService.isMoneyEnoughToBuy(any(), any())).thenReturn(Mono.just(true));
 
         webTestClient.get()
                 .uri("/cart/items")
@@ -59,7 +58,9 @@ class CartControllerTest {
 
     @Test
     void showCart_WhenCartIsEmpty_ShouldReturnCartViewWithZeroTotal() {
-        when(cartService.getCartItems(any())).thenReturn(Flux.empty());
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
+        when(cartService.isMoneyEnoughToBuy(any(), any())).thenReturn(Mono.just(true));
+
 
         webTestClient.get()
                 .uri("/cart/items")

@@ -1,6 +1,7 @@
 package org.yandex.mymarketapp.repository;
 
 
+import com.redis.testcontainers.RedisContainer;
 import lombok.SneakyThrows;
 import org.junit.platform.commons.support.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,17 @@ public abstract class PostgresBaseIntegrationTest {
         registry.add("spring.liquibase.user", postgres::getUsername);
         registry.add("spring.liquibase.password", postgres::getPassword);
     }
+
+    @Container
+    static final RedisContainer redisContainer = new RedisContainer("redis:7.0.11-alpine");
+
+    @DynamicPropertySource
+    static void configureRedis(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", redisContainer::getHost);
+        registry.add("spring.data.redis.port", redisContainer::getRedisPort);
+//        registry.add("spring.data.redis.username", redisContainer::get);
+    }
+
 
 
     @SneakyThrows

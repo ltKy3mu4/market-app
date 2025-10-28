@@ -7,6 +7,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.yandex.mymarketapp.model.domain.CartPosition;
+import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.ItemService;
@@ -24,9 +26,9 @@ public class ItemController {
 
 
     @GetMapping("/{id}")
-    public Mono<String> showItem(@PathVariable Long id, Model model) {
-        return itemService.getItemById(id)
-                .doOnNext(item -> model.addAttribute("item", item))
+    public Mono<String> showItem(@PathVariable Long id, @RequestParam(defaultValue = "0") Long userId, Model model) {
+        return Mono.zip(itemService.getItemById(id), cartService.getCountOfItemInCartByUserId(userId, id))
+                .doOnNext(t -> model.addAttribute("item", new ItemDto(t.getT1(), t.getT2())))
                 .thenReturn("item");
     }
 

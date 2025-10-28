@@ -3,8 +3,6 @@ package org.yandex.mymarketapp.repository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.jdbc.Sql;
 import org.yandex.mymarketapp.model.domain.Item;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.repo.ItemRepository;
@@ -12,7 +10,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 
@@ -52,7 +49,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithNoSearchTermAndNoSort_ShouldReturnAllItems() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems(null, "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
@@ -63,13 +60,13 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithSearchTerm_ShouldReturnMatchingItems() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("Test", "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems("Test", "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
                     assertFalse(items.isEmpty());
                     assertTrue(items.stream()
-                            .map(e -> e.title())
+                            .map(e -> e.getTitle())
                             .allMatch(title -> title.toLowerCase().contains("test")));
                 })
                 .verifyComplete();
@@ -77,7 +74,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithSearchTermInDescription_ShouldReturnMatchingItems() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("Description", "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems("Description", "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
@@ -88,7 +85,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithNonMatchingSearchTerm_ShouldReturnEmpty() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("NonExistentItem", "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems("NonExistentItem", "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
@@ -99,18 +96,18 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithSortByPriceAsc_ShouldReturnItemsSortedByPrice() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "PRICE", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems(null, "PRICE", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
                     assertEquals(3, items.size());
 
-                    List<ItemDto> sortedItems = items.stream()
-                            .sorted(Comparator.comparingDouble(ItemDto::price))
+                    List<Item> sortedItems = items.stream()
+                            .sorted(Comparator.comparingDouble(Item::getPrice))
                             .toList();
 
                     for (int i = 0; i < sortedItems.size() - 1; i++) {
-                        assertTrue(sortedItems.get(i).price() <= sortedItems.get(i + 1).price());
+                        assertTrue(sortedItems.get(i).getPrice() <= sortedItems.get(i + 1).getPrice());
                     }
                 })
                 .verifyComplete();
@@ -118,19 +115,19 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithSortByAlphaAsc_ShouldReturnItemsSortedByTitle() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "ALPHA", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems(null, "ALPHA", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
                     assertEquals(3, items.size());
 
                     // Verify ascending alphabetical order
-                    List<ItemDto> sortedItems = items.stream()
-                            .sorted(Comparator.comparing(ItemDto::title))
+                    List<Item> sortedItems = items.stream()
+                            .sorted(Comparator.comparing(Item::getTitle))
                             .toList();
 
                     for (int i = 0; i < sortedItems.size() - 1; i++) {
-                        assertTrue(sortedItems.get(i).title().compareTo(sortedItems.get(i + 1).title()) <= 0);
+                        assertTrue(sortedItems.get(i).getTitle().compareTo(sortedItems.get(i + 1).getTitle()) <= 0);
                     }
                 })
                 .verifyComplete();
@@ -138,19 +135,19 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithSortByNo_ShouldReturnItemsSortedById() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount(null, "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems(null, "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
                     assertEquals(3, items.size());
 
                     // Verify ascending ID order
-                    List<ItemDto> sortedItems = items.stream()
-                            .sorted(Comparator.comparingLong(ItemDto::id))
+                    List<Item> sortedItems = items.stream()
+                            .sorted(Comparator.comparingLong(Item::getId))
                             .toList();
 
                     for (int i = 0; i < sortedItems.size() - 1; i++) {
-                        assertTrue(sortedItems.get(i).id() < sortedItems.get(i + 1).id());
+                        assertTrue(sortedItems.get(i).getId() < sortedItems.get(i + 1).getId());
                     }
                 })
                 .verifyComplete();
@@ -161,7 +158,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
         int limit = 2;
 
         // First page
-        Flux<ItemDto> firstPageFlux = itemRepository.findItemsWithCount(null, "NO", limit, 0);
+        Flux<Item> firstPageFlux = itemRepository.findItems(null, "NO", limit, 0);
 
         StepVerifier.create(firstPageFlux.collectList())
                 .assertNext(items -> {
@@ -170,7 +167,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
                 .verifyComplete();
 
         // Second page
-        Flux<ItemDto> secondPageFlux = itemRepository.findItemsWithCount(null, "NO", limit, limit);
+        Flux<Item> secondPageFlux = itemRepository.findItems(null, "NO", limit, limit);
 
         StepVerifier.create(secondPageFlux.collectList())
                 .assertNext(items -> {
@@ -181,7 +178,7 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithEmptySearchTerm_ShouldReturnAllItems() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("", "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems("", "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
@@ -192,13 +189,13 @@ class ItemRepositoryTest extends PostgresBaseIntegrationTest {
 
     @Test
     void findItemsWithCount_WithCaseInsensitiveSearch_ShouldReturnMatchingItems() {
-        Flux<ItemDto> itemsFlux = itemRepository.findItemsWithCount("TEST", "NO", 10, 0);
+        Flux<Item> itemsFlux = itemRepository.findItems("TEST", "NO", 10, 0);
 
         StepVerifier.create(itemsFlux.collectList())
                 .assertNext(items -> {
                     assertFalse(items.isEmpty());
                     assertTrue(items.stream()
-                            .map(ItemDto::title)
+                            .map(Item::getTitle)
                             .allMatch(title -> title.toLowerCase().contains("test")));
                 })
                 .verifyComplete();

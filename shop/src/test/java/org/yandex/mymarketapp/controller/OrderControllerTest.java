@@ -7,6 +7,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.dto.OrderDto;
+import org.yandex.mymarketapp.model.dto.OrdersDto;
 import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.service.OrderService;
 import reactor.core.publisher.Flux;
@@ -39,7 +40,7 @@ class OrderControllerTest {
                 ), 75.0)
         );
 
-        when(orderService.getAllOrders(0L)).thenReturn(Flux.fromIterable(mockOrders));
+        when(orderService.getAllOrders(0L)).thenReturn(Mono.just(new OrdersDto(mockOrders)));
 
         webTestClient.get()
                 .uri("/orders")
@@ -56,7 +57,7 @@ class OrderControllerTest {
 
     @Test
     void showOrders_WhenNoOrdersExist_ShouldReturnEmptyList() {
-        when(orderService.getAllOrders(0L)).thenReturn(Flux.empty());
+        when(orderService.getAllOrders(0L)).thenReturn(Mono.just(new OrdersDto(List.of())));
 
         webTestClient.get()
                 .uri("/orders")
@@ -161,7 +162,7 @@ class OrderControllerTest {
     @Test
     void showOrders_WhenServiceReturnsError_ShouldHandleGracefully() {
         when(orderService.getAllOrders(0L))
-                .thenReturn(Flux.error(new RuntimeException("Service error")));
+                .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         webTestClient.get()
                 .uri("/orders")

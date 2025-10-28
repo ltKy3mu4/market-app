@@ -2,10 +2,14 @@ package org.yandex.mymarketapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.Order;
 import org.yandex.mymarketapp.model.dto.OrderDto;
+import org.yandex.mymarketapp.model.dto.OrdersDto;
+import org.yandex.mymarketapp.model.exception.OrderCreateException;
 import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.model.mapper.OrderMapper;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
@@ -13,6 +17,8 @@ import org.yandex.mymarketapp.repo.OrderRepository;
 import org.yandex.payment.model.PaymentRequest;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -25,9 +31,11 @@ public class OrderService {
     private final org.yandex.payment.api.PaymentsApi payApi;
 
     @Transactional
+    @CacheEvict(value = "orders", key = "#userId")
     public Mono<Void> makeOrder(Long userId) {
         log.info("Making order");
         return cartRepo.getAllCartPositions(userId)
+                .switchIfEmpty(Mono.defer(() -> Mono.error(new OrderCreateException("Cannot create order. cart is empty"))))
                 .collectList()
                 .flatMap(items -> {
                     Order order = new Order();
@@ -43,9 +51,13 @@ public class OrderService {
                 .then();
     }
 
-    public Flux<OrderDto> getAllOrders(Long userId) {
+    @Cacheable(value = "orders", key = "#userId")
+    public Mono<OrdersDto> getAllOrders(Long userId) {
         return orderRepo.getAllWithPositions(userId)
-                .map(orderMapper::toDto);
+                .map(orderMapper::toDto)
+                .collectList()
+                .doOnNext(or -> log.info("Get orders for user {} from DB", userId))
+                .map(orders -> new OrdersDto(orders));
     }
 
     public Mono<OrderDto> getOrderById(Long id, Long userId) {

@@ -17,10 +17,12 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+      username: ${REDIS_USER:redis}
+      password: ${REDIS_USER_PASSWORD:redispass}
   cache:
     redis:
       time-to-live: PT1M    # TTL по умолчанию для кеше
 
 payment:
   service:
-    url: ${PAYMENT_API_URL}
+    url: ${PAYMENT_API_URL:http://localhost:8082}

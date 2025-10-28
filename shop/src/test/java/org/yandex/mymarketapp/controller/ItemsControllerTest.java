@@ -5,8 +5,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.dto.Paging;
+import org.yandex.mymarketapp.model.dto.ViewPage;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.ItemService;
 import reactor.core.publisher.Mono;
@@ -31,19 +33,26 @@ class ItemsControllerTest {
 
     @Test
     void getItemsPage_WithDefaultParameters_ShouldReturnItemsView() {
-        // Given
         List<List<ItemDto>> mockItems = Arrays.asList(
                 Arrays.asList(
-                        new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 10.0, 1),
-                        new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 20.0, 2)
+                        new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 10.0, 0),
+                        new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 20.0, 0),
+                        new ItemDto(3L, "Item 3", "Desc 3", "/img3.jpg", 30.0, 0),
+                        new ItemDto(4L, "Item 4", "Desc 4", "/img4.jpg", 40.0, 0)
                 )
         );
+
+        List<ItemDto> cartItems = Arrays.asList(
+                        new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 10.0, 1),
+                        new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 20.0, 2)
+        );
+
         Paging mockPaging = new Paging(1, 10, true, false);
 
-        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(mockItems));
+        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(new ViewPage(mockItems)));
         when(itemService.getPageInfo(10, 1)).thenReturn(Mono.just(mockPaging));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(cartItems)));
 
-        // When & Then
         webTestClient.get()
                 .uri("/")
                 .exchange()
@@ -51,19 +60,17 @@ class ItemsControllerTest {
 
         verify(itemService).searchItems("", "NO", 1, 10);
         verify(itemService).getPageInfo(10, 1);
-        verifyNoInteractions(cartService);
     }
 
     @Test
     void getItemsPage_WithItemsPath_ShouldReturnItemsView() {
-        // Given
         List<List<ItemDto>> mockItems = Collections.emptyList();
         Paging mockPaging = new Paging(1, 10, false, false);
 
-        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(mockItems));
+        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(new ViewPage(mockItems)));
         when(itemService.getPageInfo(10, 1)).thenReturn(Mono.just(mockPaging));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
 
-        // When & Then
         webTestClient.get()
                 .uri("/items")
                 .exchange()
@@ -75,16 +82,15 @@ class ItemsControllerTest {
 
     @Test
     void getItemsPage_WithSearchParameters_ShouldReturnFilteredItems() {
-        // Given
         List<List<ItemDto>> mockItems = Arrays.asList(
-                Arrays.asList(new ItemDto(1L, "Test Item", "Desc", "/img.jpg", 15.0, 1))
+                Arrays.asList(new ItemDto(1L, "Test Item", "Desc", "/img.jpg", 15.0, 0))
         );
         Paging mockPaging = new Paging(2, 5, true, true);
 
-        when(itemService.searchItems("test", "PRICE", 2, 5)).thenReturn(Mono.just(mockItems));
+        when(itemService.searchItems("test", "PRICE", 2, 5)).thenReturn(Mono.just(new ViewPage(mockItems)));
         when(itemService.getPageInfo(5, 2)).thenReturn(Mono.just(mockPaging));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
 
-        // When & Then
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/")
@@ -102,18 +108,18 @@ class ItemsControllerTest {
 
     @Test
     void getItemsPage_WithEmptySearch_ShouldReturnAllItems() {
-        // Given
         List<List<ItemDto>> mockItems = Arrays.asList(
                 Arrays.asList(
-                        new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 10.0, 1),
-                        new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 20.0, 2),
-                        new ItemDto(3L, "Item 3", "Desc 3", "/img3.jpg", 30.0, 3)
+                        new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 10.0, 0),
+                        new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 20.0, 0),
+                        new ItemDto(3L, "Item 3", "Desc 3", "/img3.jpg", 30.0, 0)
                 )
         );
         Paging mockPaging = new Paging(1, 20, true, false);
 
-        when(itemService.searchItems("", "ALPHA", 1, 20)).thenReturn(Mono.just(mockItems));
+        when(itemService.searchItems("", "ALPHA", 1, 20)).thenReturn(Mono.just(new ViewPage(mockItems)));
         when(itemService.getPageInfo(20, 1)).thenReturn(Mono.just(mockPaging));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
 
         // When & Then
         webTestClient.get()
@@ -382,14 +388,13 @@ class ItemsControllerTest {
 
     @Test
     void getItemsPage_WhenServiceReturnsEmpty_ShouldHandleGracefully() {
-        // Given
         List<List<ItemDto>> mockItems = Collections.emptyList();
         Paging mockPaging = new Paging(1, 10, false, false);
 
-        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(mockItems));
+        when(itemService.searchItems("", "NO", 1, 10)).thenReturn(Mono.just(new ViewPage(mockItems)));
         when(itemService.getPageInfo(10, 1)).thenReturn(Mono.just(mockPaging));
+        when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
 
-        // When & Then
         webTestClient.get()
                 .uri("/")
                 .exchange()
@@ -397,6 +402,5 @@ class ItemsControllerTest {
 
         verify(itemService).searchItems("", "NO", 1, 10);
         verify(itemService).getPageInfo(10, 1);
-        verifyNoInteractions(cartService);
     }
 }

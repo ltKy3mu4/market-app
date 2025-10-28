@@ -2,9 +2,12 @@ package org.yandex.mymarketapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.CartPosition;
+import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.model.mapper.ItemMapper;
@@ -12,6 +15,8 @@ import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.ItemRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -25,6 +30,7 @@ public class CartService {
     private final org.yandex.payment.api.BalanceApi balanceApi;
 
     @Transactional
+    @CacheEvict(value = {"cart_items"}, key = "#userId")
     public Mono<Void> increaseQuantityInCart(Long itemId, Long userId) {
         return cartRepo.findByItemIdAndUserId(itemId, userId)
                 .hasElement()
@@ -43,6 +49,7 @@ public class CartService {
     }
 
     @Transactional
+    @CacheEvict(value = "cart_items", key = "#userId")
     public Mono<Void> decreaseQuantityInCart(Long itemId, Long userId) {
         return cartRepo.findByItemIdAndUserId(itemId, userId)
                 .flatMap(cartPosition -> {
@@ -60,6 +67,7 @@ public class CartService {
     }
 
     @Transactional
+    @CacheEvict(value = "cart_items", key = "#userId")
     public Mono<Void> removeFromCart(Long itemId, Long userId) {
         return cartRepo.removeItemFromCartByItemId(itemId, userId)
                 .doFirst(() -> log.info("removing position for id {} for user {}", itemId, userId))
@@ -72,22 +80,25 @@ public class CartService {
                 }).then();
     }
 
-    public Flux<ItemDto> getCartItems(Long userId) {
+    @Cacheable(value = "cart_items", key = "#userId")
+    public Mono<CartItemsDto> getCartItems(Long userId) {
         return cartRepo.findByUserId(userId)
+                .doOnNext(c -> log.info("getting cart items for user {} from DB", userId))
                 .flatMap(cp -> itemsRepo.getItemById(cp.getItemId())
                         .switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found: " + cp.getItemId())))
-                        .map(item -> itemMapper.toDto(item, cp.getCount())));
+                        .map(item -> itemMapper.toDto(item, cp.getCount())))
+                .collectList()
+                .map(CartItemsDto::new);
     }
 
-    public Mono<Boolean> isMoneyEnoughToBuy(Long userId) {
-        return this.getCartItems(userId)
-                .collectList()
-                .map(items -> items.stream().mapToDouble(e->e.count()*e.price()).sum())
-                .flatMap(price -> Mono.zip(Mono.just(price), balanceApi.getUserBalance(userId)))
-                .flatMap(tuple -> {
-                    Double totalPrice = tuple.getT1();
-                    Float userBalance = tuple.getT2().getBalance();
-                    return Mono.just(userBalance >= totalPrice);
-                });
+    public Mono<Integer> getCountOfItemInCartByUserId(Long userId, Long itemId) {
+        return cartRepo.findCountByUserIdAndItemId(userId, itemId)
+                .switchIfEmpty(Mono.just(0));
+    }
+
+
+    public Mono<Boolean> isMoneyEnoughToBuy(Double totalPrice, Long userId) {
+        return balanceApi.getUserBalance(userId)
+                .flatMap(userBalance -> Mono.just(userBalance.getBalance() >= totalPrice));
     }
 }

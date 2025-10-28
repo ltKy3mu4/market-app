@@ -17,6 +17,9 @@ public interface CartPositionsRepository extends R2dbcRepository<CartPosition, L
 
     Mono<CartPosition> findByItemIdAndUserId(Long itemId, Long userId);
 
+    @Query("SELECT cart_positions.count from cart_positions where item_id = :itemId and user_id = :userId")
+    Mono<Integer> findCountByUserIdAndItemId(@Param("userId") Long userId, @Param("itemId") Long itemId);
+
     @Modifying
     @Query("UPDATE cart_positions SET count = count + 1 WHERE item_id = :itemId and user_id = :userId")
     Mono<Integer> increaseItemCount(@Param("id") Long itemId, @Param("userId") Long userId);

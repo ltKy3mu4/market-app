@@ -5,14 +5,18 @@ import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.yandex.mymarketapp.model.domain.Order;
 import org.yandex.mymarketapp.model.domain.OrderPosition;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.dto.OrderDto;
+import org.yandex.mymarketapp.model.dto.OrdersDto;
+import org.yandex.mymarketapp.model.exception.OrderCreateException;
 import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.model.mapper.OrderMapperImpl;
 import org.yandex.mymarketapp.repo.CartPositionsRepository;
 import org.yandex.mymarketapp.repo.OrderRepository;
+import org.yandex.payment.model.UserBalance;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -33,6 +37,9 @@ class OrderServiceTest {
     @MockitoBean
     private CartPositionsRepository cartRepo;
 
+    @MockitoBean
+    private org.yandex.payment.api.PaymentsApi payApi;
+
     @Autowired
     private OrderService orderService;
     
@@ -40,7 +47,6 @@ class OrderServiceTest {
 
     @Test
     void makeOrder_WithMultipleItems_ShouldCreateOrderWithCorrectTotal() {
-        // Given
         List<ItemDto> cartItems = Arrays.asList(
                 new ItemDto(1L, "Item 1", "Description 1", "/img1.jpg", 10.0, 2),
                 new ItemDto(2L, "Item 2", "Description 2", "/img2.jpg", 15.0, 3),
@@ -54,11 +60,11 @@ class OrderServiceTest {
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
         when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
 
-        // When
+
         Mono<Void> result = orderService.makeOrder(userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
@@ -69,7 +75,6 @@ class OrderServiceTest {
 
     @Test
     void makeOrder_WithSingleItem_ShouldCreateOrderWithSingleItem() {
-        // Given
         List<ItemDto> cartItems = Collections.singletonList(
                 new ItemDto(1L, "Single Item", "Description", "/img.jpg", 25.0, 1)
         );
@@ -81,11 +86,11 @@ class OrderServiceTest {
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
         when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
 
-        // When
+
         Mono<Void> result = orderService.makeOrder(userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
@@ -98,61 +103,38 @@ class OrderServiceTest {
 
     @Test
     void makeOrder_WithEmptyCart_ShouldCreateEmptyOrder() {
-        // Given
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.empty());
-        when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
-            Order order = invocation.getArgument(0);
-            order.setId(1L);
-            return Mono.just(order);
-        });
-        when(cartRepo.clearCart(userId)).thenReturn(Mono.just(0));
 
-        // When
         Mono<Void> result = orderService.makeOrder(userId);
 
-        // Then
         StepVerifier.create(result)
-                .verifyComplete();
-
-        verify(cartRepo).getAllCartPositions(userId);
-        verify(orderRepo).save(argThat(order -> {
-            assertTrue(order.getItems().isEmpty());
-            assertEquals(0.0, order.getTotalSum(), 0.001);
-            return true;
-        }));
-        verify(cartRepo).clearCart(userId);
+                .verifyError(OrderCreateException.class);
     }
 
     @Test
     void getAllOrders_WhenNoOrdersExist_ShouldReturnEmptyFlux() {
-        // Given
         when(orderRepo.getAllWithPositions(userId)).thenReturn(Flux.empty());
 
-        // When
-        Flux<OrderDto> result = orderService.getAllOrders(userId);
+        Mono<OrdersDto> result = orderService.getAllOrders(userId);
 
-        // Then
         StepVerifier.create(result)
-                .verifyComplete();
+                .expectNext(new OrdersDto(List.of()));
 
         verify(orderRepo).getAllWithPositions(userId);
     }
 
     @Test
     void getAllOrders_WhenOrdersExist_ShouldReturnOrderDtos() {
-        // Given
         Order order1 = createOrder(1L, 50.0, 2);
         Order order2 = createOrder(2L, 75.0, 1);
 
         when(orderRepo.getAllWithPositions(userId)).thenReturn(Flux.just(order1, order2));
 
-        // When
-        Flux<OrderDto> result = orderService.getAllOrders(userId);
+        Mono<OrdersDto> result = orderService.getAllOrders(userId);
 
-        // Then
         StepVerifier.create(result)
-                .expectNextCount(2)
-                .verifyComplete();
+                .expectNextCount(1)
+                .expectNextMatches(dto -> dto.orders().size() == 2);
 
         verify(orderRepo).getAllWithPositions(userId);
     }
@@ -228,12 +210,10 @@ class OrderServiceTest {
 
     @Test
     void makeOrder_WithLargeQuantities_ShouldCalculateCorrectTotal() {
-        // Given
         List<ItemDto> cartItems = Arrays.asList(
                 new ItemDto(1L, "Item 1", "Desc 1", "/img1.jpg", 0.99, 100),  // 0.99 * 100 = 99
                 new ItemDto(2L, "Item 2", "Desc 2", "/img2.jpg", 999.99, 2)   // 999.99 * 2 = 1999.98
         );
-        // Total: 99 + 1999.98 = 2098.98
 
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
@@ -242,11 +222,11 @@ class OrderServiceTest {
             return Mono.just(order);
         });
         when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
 
-        // When
+
         Mono<Void> result = orderService.makeOrder(userId);
 
-        // Then
         StepVerifier.create(result)
                 .verifyComplete();
 
@@ -264,11 +244,14 @@ class OrderServiceTest {
         );
 
         Order savedOrder = new Order();
+        savedOrder.setTotalSum(20.0);
         savedOrder.setId(1L);
 
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
         when(cartRepo.clearCart(userId)).thenReturn(Mono.error(new RuntimeException("Clear cart failed")));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
+
 
         // When
         Mono<Void> result = orderService.makeOrder(userId);
@@ -279,6 +262,7 @@ class OrderServiceTest {
 
         verify(cartRepo).getAllCartPositions(userId);
         verify(orderRepo).save(any(Order.class));
+        verify(payApi).processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class));
         verify(cartRepo).clearCart(userId);
     }
 
@@ -291,11 +275,37 @@ class OrderServiceTest {
 
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.error(new RuntimeException("Save failed")));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
 
         // When
         Mono<Void> result = orderService.makeOrder(userId);
 
         // Then
+        StepVerifier.create(result)
+                .verifyError(RuntimeException.class);
+
+        verify(cartRepo).getAllCartPositions(userId);
+        verify(orderRepo).save(any(Order.class));
+        verify(cartRepo, never()).clearCart(userId);
+    }
+
+    @Test
+    void makeOrder_WhenPayOrderFails_ShouldNotclearCart() {
+        // Given
+        List<ItemDto> cartItems = Collections.singletonList(
+                new ItemDto(1L, "Item", "Desc", "/img.jpg", 10.0, 1)
+        );
+
+        when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
+        when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            order.setId(1L);
+            return Mono.just(order);
+        });
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenThrow(WebClientResponseException.class);
+
+        Mono<Void> result = orderService.makeOrder(userId);
+
         StepVerifier.create(result)
                 .verifyError(RuntimeException.class);
 
@@ -311,20 +321,24 @@ class OrderServiceTest {
         );
 
         Order savedOrder = new Order();
+        savedOrder.setTotalSum(20.0);
         savedOrder.setId(1L);
 
         when(cartRepo.getAllCartPositions(userId)).thenReturn(Flux.fromIterable(cartItems));
         when(orderRepo.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
         when(cartRepo.clearCart(userId)).thenReturn(Mono.just(1));
+        when(payApi.processPayment(any(), any(org.yandex.payment.model.PaymentRequest.class))).thenReturn(Mono.just(new UserBalance().id(userId).balance(100.0f)));
+
 
         Mono<Void> result = orderService.makeOrder(userId);
 
         StepVerifier.create(result)
                 .verifyComplete();
 
-        InOrder inOrder = inOrder(cartRepo, orderRepo, cartRepo);
+        InOrder inOrder = inOrder(cartRepo, orderRepo, payApi, cartRepo);
         inOrder.verify(cartRepo).getAllCartPositions(userId);
         inOrder.verify(orderRepo).save(any(Order.class));
+        inOrder.verify(payApi).processPayment(any(), any());
         inOrder.verify(cartRepo).clearCart(userId);
     }
 

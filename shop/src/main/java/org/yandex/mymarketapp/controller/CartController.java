@@ -23,12 +23,14 @@ public class CartController {
     @GetMapping("/items")
     public Mono<String> showCart(Model model, @RequestParam(defaultValue = "0") Long userId) {
         return cartService.getCartItems(userId)
-                .collectList()
-                .flatMap( items -> Mono.zip(Mono.just(items), cartService.isMoneyEnoughToBuy(userId)))
+                .flatMap( cart -> {
+                    double totalPrice = cart.items().stream().mapToDouble(e->e.getPrice()*e.getCount()).sum();
+                    return Mono.zip(Mono.just(cart), cartService.isMoneyEnoughToBuy(totalPrice, userId));
+                })
                 .doOnNext(tuple -> {
-                    model.addAttribute("items", tuple.getT1());
+                    model.addAttribute("items", tuple.getT1().items());
                     model.addAttribute("moneyEnough", tuple.getT2());
-                    double totalPrice =  tuple.getT1().stream().mapToDouble(e-> e.price()*e.count()).sum();
+                    double totalPrice =  tuple.getT1().items().stream().mapToDouble(e-> e.getPrice()*e.getCount()).sum();
                     model.addAttribute("total", totalPrice);
                 }).thenReturn("cart");
     }
@@ -58,10 +60,6 @@ public class CartController {
         return orderService.makeOrder(userId).thenReturn("redirect:/orders");
     }
 
-//    @GetMapping("/money-is-enough")
-//    public Mono<ResponseEntity<Boolean>> isMoneyEnoughToBuy(@RequestParam(defaultValue = "0") Long userId) {
-//        return cartService.isMoneyEnoughToBuy(userId).map(ResponseEntity::ok);
-//    }
 
     public record CartBuyForm(Long id, String action){};
 }

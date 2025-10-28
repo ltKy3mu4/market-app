@@ -24,8 +24,7 @@ public class OrderController {
     @GetMapping("/orders")
     public Mono<String> showOrders(Model model, @RequestParam(defaultValue = "0") Long userId) {
         return orderService.getAllOrders(userId)
-                .collectList()
-                .doOnNext(orders -> model.addAttribute("orders", orders))
+                .doOnNext(dto -> model.addAttribute("orders", dto.orders()))
                 .thenReturn("orders");
     }
 

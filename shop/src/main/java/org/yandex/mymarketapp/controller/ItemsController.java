@@ -10,9 +10,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import org.springframework.web.util.UriComponentsBuilder;
+import org.yandex.mymarketapp.model.dto.CartItemsDto;
+import org.yandex.mymarketapp.model.dto.ItemDto;
+import org.yandex.mymarketapp.model.dto.ViewPage;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.ItemService;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 
 @Controller
@@ -28,6 +33,7 @@ public class ItemsController {
             @RequestParam(name = "sort", required = false, defaultValue = "NO") String sort,
             @RequestParam(name = "pageSize", required = false, defaultValue = "10") int pageSize,
             @RequestParam(name = "pageNumber", required = false, defaultValue = "1") int pageNumber,
+            @RequestParam(name = "userId", defaultValue = "0") Long userId,
             Model model) {
 
         model.addAttribute("search", search);
@@ -35,8 +41,14 @@ public class ItemsController {
 
         return itemService.getPageInfo(pageSize, pageNumber)
                 .doOnNext( p -> model.addAttribute("paging", p))
-                .flatMap(e -> itemService.searchItems(search, sort, pageNumber, pageSize))
-                .doOnNext(items -> model.addAttribute("items", items))
+                .flatMap(e -> Mono.zip(
+                        itemService.searchItems(search, sort, pageNumber, pageSize),
+                        cartService.getCartItems(userId)
+                ))
+                .doOnNext(t -> {
+                    this.fillPageItemsWithCountFromCart(t.getT1(), t.getT2());
+                    model.addAttribute("items", t.getT1().items());
+                })
                 .thenReturn("items");
     }
 
@@ -71,4 +83,11 @@ public class ItemsController {
     }
 
     public record MainFormData(Long id, String action, String search,  String sort, Integer pageSize, Integer pageNumber) {}
+
+    private void fillPageItemsWithCountFromCart(ViewPage vp, CartItemsDto cartItems) {
+        List<ItemDto> l = vp.items().stream().flatMap(e -> e.stream()).toList();
+        for (ItemDto it : cartItems.items()){
+            l.stream().filter(e -> e.getId() == it.getId()).findFirst().ifPresent(e -> e.setCount(it.getCount()));
+        }
+    }
 }

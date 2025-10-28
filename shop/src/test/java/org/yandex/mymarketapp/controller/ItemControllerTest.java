@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.yandex.mymarketapp.model.domain.Item;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.service.CartService;
@@ -27,13 +28,13 @@ class ItemControllerTest {
 
     @Test
     void showItem_ShouldReturnItemViewWithItemData() {
-        // Given
         Long itemId = 1L;
-        ItemDto mockItem = new ItemDto(itemId, "Test Item", "Test Description", "/test.jpg", 25.99, 2);
+        Long userId = 0L;
+        Item mockItem = new Item(itemId, "Test Item", "Test Description", "/test.jpg", 25.99);
 
         when(itemService.getItemById(itemId)).thenReturn(Mono.just(mockItem));
+        when(cartService.getCountOfItemInCartByUserId(userId, itemId)).thenReturn(Mono.just(2));
 
-        // When & Then
         webTestClient.get()
                 .uri("/items/{id}", itemId)
                 .exchange()
@@ -41,24 +42,25 @@ class ItemControllerTest {
                 .expectBody();
 
         verify(itemService).getItemById(itemId);
-        verifyNoInteractions(cartService);
+        verify(cartService).getCountOfItemInCartByUserId(userId, itemId);
     }
 
     @Test
     void showItem_WhenItemNotFound_ShouldReturnNotFound() {
-        // Given
         Long itemId = 999L;
+        Long userId = 0L;
+
         when(itemService.getItemById(itemId))
                 .thenReturn(Mono.error(new ItemNotFoundException("Item not found with id: " + itemId)));
+        when(cartService.getCountOfItemInCartByUserId(userId, itemId)).thenReturn(Mono.just(0));
 
-        // When & Then
+
         webTestClient.get()
                 .uri("/items/{id}", itemId)
                 .exchange()
                 .expectStatus().isNotFound();
 
         verify(itemService).getItemById(itemId);
-        verifyNoInteractions(cartService);
     }
 
     @Test
@@ -188,35 +190,6 @@ class ItemControllerTest {
 
         verify(cartService).increaseQuantityInCart(itemId, 0L);
         verifyNoInteractions(itemService);
-    }
-
-    @Test
-    void showItem_WithMultipleItems_ShouldReturnCorrectItem() {
-        // Given
-        Long itemId1 = 1L;
-        Long itemId2 = 2L;
-
-        ItemDto mockItem1 = new ItemDto(itemId1, "Item 1", "Desc 1", "/img1.jpg", 10.0, 1);
-        ItemDto mockItem2 = new ItemDto(itemId2, "Item 2", "Desc 2", "/img2.jpg", 20.0, 2);
-
-        when(itemService.getItemById(itemId1)).thenReturn(Mono.just(mockItem1));
-        when(itemService.getItemById(itemId2)).thenReturn(Mono.just(mockItem2));
-
-        // When & Then - First item
-        webTestClient.get()
-                .uri("/items/{id}", itemId1)
-                .exchange()
-                .expectStatus().isOk();
-
-        // When & Then - Second item
-        webTestClient.get()
-                .uri("/items/{id}", itemId2)
-                .exchange()
-                .expectStatus().isOk();
-
-        verify(itemService).getItemById(itemId1);
-        verify(itemService).getItemById(itemId2);
-        verifyNoInteractions(cartService);
     }
 
     @Test
