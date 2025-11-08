@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info:
+  title: Payment service API
+  description: API для управления платежами и балансами пользователей
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: lolKekovich@kek.lol
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+paths:
+  /api/v1/payment/{userId}/balance:
+    get:
+      tags: [Balance]
+      summary: Получение баланса пользователя
+      operationId: getUserBalance
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '200':
+          description: Текущий баланс пользоваетля
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBalance'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  value:
+                    error: "USER_NOT_FOUND"
+                    code: "USER_001"
+                    message: "Пользователь не найден"
+        '500':
+          description: Внутренняя ошибка сервиса
+  /api/v1/payment/{userId}/pay:
+    post:
+      tags: [ Payments ]
+      summary: Оплата пользователем
+      operationId: processPayment
+
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Оплата успешна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBalance'
+        '400':
+          description: Недостаточно средств или неверный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficient_funds:
+                  value:
+                    error: "INSUFFICIENT_FUNDS"
+                    code: "PAYMENT_001"
+                    message: "Недостаточно средств на счете"
+                    details: "Требуется: 100.00, доступно: 50.00"
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  value:
+                    error: "USER_NOT_FOUND"
+                    code: "USER_001"
+                    message: "Пользователь не найден"
+        '500':
+          description: Внутренняя ошибка сервиса
+tags:
+  - name: Balance
+    description: Операции с балансом пользователя
+  - name: Payments
+    description: Платежные операции
+components:
+  parameters:
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: ID пользователя
+
+  schemas:
+    UserBalance:
+      type: object
+      required: [ id, balance ]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1000001
+        balance:
+          type: number
+          format: float
+          example: 250.75
+          minimum: 0
+
+    PaymentRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+          example: 50.25
+
+    ErrorResponse:
+      type: object
+      required: [error, code, message]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: string
