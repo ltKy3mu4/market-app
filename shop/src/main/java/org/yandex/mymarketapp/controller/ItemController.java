@@ -3,11 +3,14 @@ package org.yandex.mymarketapp.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.yandex.mymarketapp.model.domain.CartPosition;
+import org.yandex.mymarketapp.model.domain.User;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.service.CartService;
@@ -26,22 +29,23 @@ public class ItemController {
 
 
     @GetMapping("/{id}")
-    public Mono<String> showItem(@PathVariable Long id, @RequestParam(defaultValue = "0") Long userId, Model model) {
-        return Mono.zip(itemService.getItemById(id), cartService.getCountOfItemInCartByUserId(userId, id))
+    public Mono<String> showItem(@PathVariable Long id, @AuthenticationPrincipal User user, Model model) {
+        return Mono.zip(itemService.getItemById(id), cartService.getCountOfItemInCartByUserId(user == null ? -1 : user.getId(), id))
                 .doOnNext(t -> model.addAttribute("item", new ItemDto(t.getT1(), t.getT2())))
                 .thenReturn("item");
     }
 
 
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/{id}")
-    public Mono<String> updateItemQuantity(@PathVariable Long id, @ModelAttribute ActionForm form, @RequestParam(defaultValue = "0") Long userId) {
+    public Mono<String> updateItemQuantity(@PathVariable Long id, @ModelAttribute ActionForm form, @AuthenticationPrincipal User user) {
         if (form == null || form.action() == null) {
             return Mono.just("redirect:/items/" + id);
         }
 
         Mono<Void> operation = switch (form.action()) {
-            case "PLUS" -> cartService.increaseQuantityInCart(id, userId);
-            case "MINUS" -> cartService.decreaseQuantityInCart(id, userId);
+            case "PLUS" -> cartService.increaseQuantityInCart(id, user.getId());
+            case "MINUS" -> cartService.decreaseQuantityInCart(id, user.getId());
             default -> Mono.empty();
         };
 

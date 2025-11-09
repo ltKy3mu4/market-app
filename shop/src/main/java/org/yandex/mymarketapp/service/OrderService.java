@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.yandex.mymarketapp.model.domain.Order;
@@ -42,6 +43,7 @@ public class OrderService {
                     var orderItems = orderMapper.toEntities(items);
                     order.setItems(orderItems);
                     order.setTotalSum(orderItems.stream().mapToDouble(e -> e.getPrice()*e.getCount()).sum());
+                    order.setUserId(userId);
                     return orderRepo.save(order);
                 })
                 .flatMap(o -> payApi.processPayment(userId, new PaymentRequest().amount(o.getTotalSum().floatValue())))

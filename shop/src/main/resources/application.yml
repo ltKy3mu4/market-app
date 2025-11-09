@@ -23,6 +23,25 @@ spring:
     redis:
       time-to-live: PT1M    # TTL по умолчанию для кеше
 
+    security:
+      oauth2:
+        client:
+          provider:
+            keycloak:
+              authorization-uri: http://localhost:8090/realms/master/protocol/openid-connect/auth
+              token-uri: http://localhost:8090/realms/master/protocol/openid-connect/token
+              user-info-uri: http://localhost:8090/realms/master/protocol/openid-connect/userinfo
+              user-name-attribute: sub
+              jwk-set-uri: http://localhost:8090/realms/master/protocol/openid-connect/certs
+          registration:
+            keycloak:
+              authorizationGrantType: authorization_code
+              provider: keycloak
+              client-id: spring-reactive-market-app
+              client-secret: 0lFtL8ZSVrRVdIv5L7ir4X9PzT7N7Xd0
+              redirect-uri: '{baseUrl}/{action}/oauth2/code/{registrationId}'
+              scope: openid, profile, email
+
 payment:
   service:
     url: ${PAYMENT_API_URL:http://localhost:8082}

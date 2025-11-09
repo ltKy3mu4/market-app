@@ -2,6 +2,8 @@ package org.yandex.mymarketapp.controller;
 
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import org.springframework.web.util.UriComponentsBuilder;
+import org.yandex.mymarketapp.model.domain.User;
 import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.model.dto.ViewPage;
@@ -33,7 +36,7 @@ public class ItemsController {
             @RequestParam(name = "sort", required = false, defaultValue = "NO") String sort,
             @RequestParam(name = "pageSize", required = false, defaultValue = "10") int pageSize,
             @RequestParam(name = "pageNumber", required = false, defaultValue = "1") int pageNumber,
-            @RequestParam(name = "userId", defaultValue = "0") Long userId,
+            @AuthenticationPrincipal User user,
             Model model) {
 
         model.addAttribute("search", search);
@@ -43,7 +46,7 @@ public class ItemsController {
                 .doOnNext( p -> model.addAttribute("paging", p))
                 .flatMap(e -> Mono.zip(
                         itemService.searchItems(search, sort, pageNumber, pageSize),
-                        cartService.getCartItems(userId)
+                        cartService.getCartItems(user == null ? -1 : user.getId())
                 ))
                 .doOnNext(t -> {
                     this.fillPageItemsWithCountFromCart(t.getT1(), t.getT2());
@@ -52,8 +55,9 @@ public class ItemsController {
                 .thenReturn("items");
     }
 
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/items")
-    public Mono<String> handleItemAction(@ModelAttribute MainFormData data, @RequestParam(defaultValue = "0") Long userId) {
+    public Mono<String> handleItemAction(@ModelAttribute MainFormData data, @AuthenticationPrincipal User user) {
         if (data == null || data.action() == null || data.id() == null) {
             return Mono.just(UriComponentsBuilder.fromPath("redirect:/")
                     .queryParam("search", data== null || data.search == null ? "" : data.search)
@@ -67,8 +71,8 @@ public class ItemsController {
 
 
         Mono<Void> operation = switch (data.action) {
-            case "PLUS" -> cartService.increaseQuantityInCart(data.id, userId);
-            case "MINUS" -> cartService.decreaseQuantityInCart(data.id, userId);
+            case "PLUS" -> cartService.increaseQuantityInCart(data.id, user.getId());
+            case "MINUS" -> cartService.decreaseQuantityInCart(data.id, user.getId());
             default -> Mono.empty();
         };
         return operation.then(Mono.fromCallable(() ->
