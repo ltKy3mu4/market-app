@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity5">
 
 <head>
     <meta charset="utf-8">
@@ -16,8 +16,10 @@
                     <h2>
                         <span class="badge text-bg-success">Витрина магазина</span>
                     </h2>
-                    <a href="/orders" class="btn btn-secondary ms-auto bi bi-file-earmark-text"> Заказы</a>
-                    <a href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
+                    <div sec:authorize="isFullyAuthenticated()">
+                        <a href="/orders" class="btn btn-secondary ms-auto bi bi-file-earmark-text"> Заказы</a>
+                        <a href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
+                    </div>
                     <a href="/items" class="btn btn-secondary bi bi-arrow-left-square"> Главная</a>
                 </div>
             </div>
@@ -32,7 +34,7 @@
                             <span class="badge text-bg-success justify-content-end" th:text="${item.price()}+' руб.'"></span>
                         </h5>
                         <p class="card-text" th:text="${item.description()}"></p>
-                        <div class="hstack gap-3">
+                        <div class="hstack gap-3" sec:authorize="isFullyAuthenticated()">
                             <!-- MINUS button form -->
                             <form th:action="@{${'/items/'+item.id()}}" method="post" style="display: inline;">
                                 <input type="hidden" name="action" value="MINUS">

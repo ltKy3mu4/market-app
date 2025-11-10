@@ -2,6 +2,9 @@ package org.yandex.mymarketapp.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PostAuthorize;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -9,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
+import org.yandex.mymarketapp.model.domain.User;
 import org.yandex.mymarketapp.model.exception.ItemNotFoundException;
 import org.yandex.mymarketapp.model.exception.OrderNotFoundException;
 import org.yandex.mymarketapp.service.OrderService;
@@ -21,16 +25,18 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/orders")
-    public Mono<String> showOrders(Model model, @RequestParam(defaultValue = "0") Long userId) {
-        return orderService.getAllOrders(userId)
+    public Mono<String> showOrders(Model model, @AuthenticationPrincipal User user) {
+        return orderService.getAllOrders(user.getId())
                 .doOnNext(dto -> model.addAttribute("orders", dto.orders()))
                 .thenReturn("orders");
     }
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/orders/{id}")
-    public Mono<String> showOrderDetails(@PathVariable Long id, Model model, @RequestParam(defaultValue = "0") Long userId) {
-        return orderService.getOrderById(id, userId)
+    public Mono<String> showOrderDetails(@PathVariable Long id, Model model, @AuthenticationPrincipal User user) {
+        return orderService.getOrderById(id, user.getId())
                 .doOnNext(order -> model.addAttribute("order", order))
                 .thenReturn("order");
     }

@@ -23,6 +23,20 @@ spring:
     redis:
       time-to-live: PT1M    # TTL по умолчанию для кеше
 
+  security:
+    oauth2:
+      client:
+        provider:
+          spring:
+            issuer-uri: ${ISSUER_URL:http://localhost:8081}
+        registration:
+          shop-client:
+            provider: spring
+            client-id: shop-client
+            client-secret: ${SHOP_OAUTH_SECRET:shop-secret}
+            authorization-grant-type: client_credentials
+            client-authentication-method: client_secret_basic
+            scope: payment
 payment:
   service:
     url: ${PAYMENT_API_URL:http://localhost:8082}

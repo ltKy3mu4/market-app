@@ -3,10 +3,14 @@ package org.yandex.mymarketapp.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.yandex.mymarketapp.model.domain.User;
 import org.yandex.mymarketapp.model.dto.BalanceDto;
 import org.yandex.mymarketapp.service.CartService;
 import org.yandex.mymarketapp.service.OrderService;
@@ -20,12 +24,13 @@ public class CartController {
     private final CartService cartService;
     private final OrderService orderService;
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/items")
-    public Mono<String> showCart(Model model, @RequestParam(defaultValue = "0") Long userId) {
-        return cartService.getCartItems(userId)
+    public Mono<String> showCart(Model model, @AuthenticationPrincipal User user) {
+        return cartService.getCartItems(user.getId())
                 .flatMap( cart -> {
                     double totalPrice = cart.items().stream().mapToDouble(e->e.getPrice()*e.getCount()).sum();
-                    return Mono.zip(Mono.just(cart), cartService.isMoneyEnoughToBuy(totalPrice, userId));
+                    return Mono.zip(Mono.just(cart), cartService.isMoneyEnoughToBuy(totalPrice, user.getId()));
                 })
                 .doOnNext(tuple -> {
                     model.addAttribute("items", tuple.getT1().items());
@@ -35,8 +40,9 @@ public class CartController {
                 }).thenReturn("cart");
     }
 
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/items")
-    public Mono<String> updateCartItem(@ModelAttribute CartBuyForm form, @RequestParam(defaultValue = "0") Long userId) {
+    public Mono<String> updateCartItem(@ModelAttribute CartBuyForm form, @AuthenticationPrincipal User user) {
 
         if (form == null || form.action() == null || form.id() == null) {
             return Mono.just(UriComponentsBuilder.fromPath("redirect:/cart/items")
@@ -46,18 +52,19 @@ public class CartController {
 
 
         Mono<Void> operation = switch (form.action()) {
-            case "PLUS" -> cartService.increaseQuantityInCart(form.id, userId);
-            case "MINUS" -> cartService.decreaseQuantityInCart(form.id, userId);
-            case "DELETE" -> cartService.removeFromCart(form.id, userId);
+            case "PLUS" -> cartService.increaseQuantityInCart(form.id, user.getId());
+            case "MINUS" -> cartService.decreaseQuantityInCart(form.id, user.getId());
+            case "DELETE" -> cartService.removeFromCart(form.id, user.getId());
             default -> Mono.empty();
         };
 
         return operation.thenReturn("redirect:/cart/items");
     }
 
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/buy")
-    public Mono<String> buyItems(@RequestParam(defaultValue = "0") Long userId) {
-        return orderService.makeOrder(userId).thenReturn("redirect:/orders");
+    public Mono<String> buyItems(@AuthenticationPrincipal User user) {
+        return orderService.makeOrder(user.getId()).thenReturn("redirect:/orders");
     }
 
 

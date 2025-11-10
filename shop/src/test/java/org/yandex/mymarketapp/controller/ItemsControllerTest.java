@@ -3,6 +3,8 @@ package org.yandex.mymarketapp.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.yandex.mymarketapp.model.dto.CartItemsDto;
@@ -19,11 +21,7 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-@WebFluxTest(ItemsController.class)
-class ItemsControllerTest {
-
-    @Autowired
-    private WebTestClient webTestClient;
+class ItemsControllerTest extends BaseControllerTest {
 
     @MockitoBean
     private ItemService itemService;
@@ -32,6 +30,7 @@ class ItemsControllerTest {
     private CartService cartService;
 
     @Test
+    @WithMockUser
     void getItemsPage_WithDefaultParameters_ShouldReturnItemsView() {
         List<List<ItemDto>> mockItems = Arrays.asList(
                 Arrays.asList(
@@ -63,6 +62,7 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithMockUser
     void getItemsPage_WithItemsPath_ShouldReturnItemsView() {
         List<List<ItemDto>> mockItems = Collections.emptyList();
         Paging mockPaging = new Paging(1, 10, false, false);
@@ -81,6 +81,7 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithMockUser
     void getItemsPage_WithSearchParameters_ShouldReturnFilteredItems() {
         List<List<ItemDto>> mockItems = Arrays.asList(
                 Arrays.asList(new ItemDto(1L, "Test Item", "Desc", "/img.jpg", 15.0, 0))
@@ -107,6 +108,7 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithMockUser
     void getItemsPage_WithEmptySearch_ShouldReturnAllItems() {
         List<List<ItemDto>> mockItems = Arrays.asList(
                 Arrays.asList(
@@ -138,10 +140,11 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithPlusAction_ShouldIncreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -158,15 +161,16 @@ class ItemsControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/?search=test&sort=PRICE&pageSize=10&pageNumber=2");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithMinusAction_ShouldDecreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.decreaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.decreaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -183,11 +187,12 @@ class ItemsControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/?search=item&sort=NO&pageSize=5&pageNumber=1");
 
-        verify(cartService).decreaseQuantityInCart(itemId, 0L);
+        verify(cartService).decreaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithInvalidAction_ShouldRedirectWithoutServiceCall() {
         // Given
         Long itemId = 1L;
@@ -212,6 +217,7 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithMissingId_ShouldRedirectWithDefaultParams() {
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
@@ -231,10 +237,8 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithMissingAction_ShouldRedirectWithDefaultParams() {
-        // Given - No action parameter
-
-        // When & Then
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/items")
@@ -253,12 +257,11 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithDefaultPagination_ShouldUseDefaultsInRedirect() {
-        // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
-        // When & Then
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/items")
@@ -270,13 +273,14 @@ class ItemsControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/?search=test&sort=NO&pageSize=10&pageNumber=1");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithSpecialCharactersInSearch_ShouldEncodeInRedirect() {
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
@@ -292,15 +296,14 @@ class ItemsControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/?search=test%20item&sort=ALPHA&pageSize=15&pageNumber=3");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithCaseSensitiveActions_ShouldWorkCorrectly() {
-        // Given
         Long itemId = 1L;
 
-        // When & Then - lowercase should not match
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/items")
@@ -320,8 +323,8 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithNullAction_ShouldRedirectWithoutServiceCall() {
-        // Given
         Long itemId = 1L;
 
         webTestClient.post()
@@ -343,12 +346,11 @@ class ItemsControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WithFormData_ShouldWorkCorrectly() {
-        // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
-        // When & Then - Using form data
         webTestClient.post()
                 .uri("/items")
                 .bodyValue("id=1&action=PLUS&search=test&sort=PRICE&pageSize=10&pageNumber=2")
@@ -357,18 +359,17 @@ class ItemsControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/?search=test&sort=PRICE&pageSize=10&pageNumber=2");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void handleItemAction_WhenServiceFails_ShouldPropagateError() {
-        // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L))
+        when(cartService.increaseQuantityInCart(itemId, USER_ID))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
-        // When & Then
         webTestClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/items")
@@ -382,11 +383,12 @@ class ItemsControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void getItemsPage_WhenServiceReturnsEmpty_ShouldHandleGracefully() {
         List<List<ItemDto>> mockItems = Collections.emptyList();
         Paging mockPaging = new Paging(1, 10, false, false);

@@ -9,9 +9,11 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -23,6 +25,10 @@ import java.time.Duration;
 @Testcontainers
 @DirtiesContext
 public abstract class PostgresBaseIntegrationTest {
+
+    // To mock oauth security requests
+    @MockitoBean
+    ReactiveClientRegistrationRepository reactiveClientRegistrationRepositoryMock;
 
     @Autowired
     protected DatabaseClient databaseClient;

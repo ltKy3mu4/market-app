@@ -38,7 +38,7 @@ class OrderServiceTest {
     private CartPositionsRepository cartRepo;
 
     @MockitoBean
-    private org.yandex.payment.api.PaymentsApi payApi;
+    private org.openapitools.client.api.PaymentsApi payApi;
 
     @Autowired
     private OrderService orderService;

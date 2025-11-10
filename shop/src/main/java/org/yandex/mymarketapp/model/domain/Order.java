@@ -20,7 +20,7 @@ public class Order {
     @Min(value = 0)
     private Double totalSum;
 
-    @Column
+    @Column("user_id")
     private Long userId;
 
     @ReadOnlyProperty

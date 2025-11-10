@@ -3,11 +3,19 @@ package org.yandex.mymarketapp.controller;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.context.support.WithUserDetails;
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.yandex.mymarketapp.model.domain.UserRole;
 import org.yandex.mymarketapp.model.dto.CartItemsDto;
 import org.yandex.mymarketapp.model.dto.ItemDto;
 import org.yandex.mymarketapp.service.CartService;
@@ -20,12 +28,7 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-@WebFluxTest(CartController.class)
-@Import(CartController.class)
-class CartControllerTest {
-
-    @Autowired
-    private WebTestClient webTestClient;
+class CartControllerTest extends BaseControllerTest{
 
     @MockitoBean
     private CartService cartService;
@@ -34,6 +37,7 @@ class CartControllerTest {
     private OrderService orderService;
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showCart_ShouldReturnCartViewWithItemsAndTotal() {
         List<ItemDto> mockCartItems = Arrays.asList(
                 new ItemDto(1L, "Item 1", "Description 1", "/img1.jpg", 10.0, 2),
@@ -43,7 +47,9 @@ class CartControllerTest {
         when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(mockCartItems)));
         when(cartService.isMoneyEnoughToBuy(any(), any())).thenReturn(Mono.just(true));
 
-        webTestClient.get()
+
+        webTestClient
+                .get()
                 .uri("/cart/items")
                 .exchange()
                 .expectStatus().isOk()
@@ -57,6 +63,7 @@ class CartControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showCart_WhenCartIsEmpty_ShouldReturnCartViewWithZeroTotal() {
         when(cartService.getCartItems(any())).thenReturn(Mono.just(new CartItemsDto(List.of())));
         when(cartService.isMoneyEnoughToBuy(any(), any())).thenReturn(Mono.just(true));
@@ -71,12 +78,14 @@ class CartControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithPlusAction_ShouldIncreaseQuantity() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
-        webTestClient.post()
+        webTestClient
+                .post()
                 .uri("/cart/items")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .bodyValue("id=" + itemId + "&action=PLUS")
@@ -84,15 +93,16 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(orderService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithMinusAction_ShouldDecreaseQuantity() {
         Long itemId = 1L;
 
-        when(cartService.decreaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.decreaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -102,15 +112,16 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).decreaseQuantityInCart(itemId, 0L);
+        verify(cartService).decreaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(orderService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithDeleteAction_ShouldRemoveItem() {
         Long itemId = 1L;
 
-        when(cartService.removeFromCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.removeFromCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -120,11 +131,12 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).removeFromCart(itemId, 0L);
+        verify(cartService).removeFromCart(itemId, USER_ID);
         verifyNoInteractions(orderService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithInvalidAction_ShouldStillRedirect() {
         Long itemId = 1L;
 
@@ -140,10 +152,11 @@ class CartControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithFormData_ShouldWorkCorrectly() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // Alternative approach using form data instead of bodyValue
         webTestClient.post()
@@ -154,12 +167,13 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/cart/items");
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void buyItems_ShouldCreateOrder() {
-        when(orderService.makeOrder(0L)).thenReturn(Mono.empty());
+        when(orderService.makeOrder(USER_ID)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/buy")
@@ -167,11 +181,12 @@ class CartControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/orders");
 
-        verify(orderService).makeOrder(0L);
-        verifyNoInteractions(cartService); // Note: Your reactive controller doesn't call cartService in buyItems
+        verify(orderService).makeOrder(USER_ID);
+        verifyNoInteractions(cartService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WithCaseSensitiveActions_ShouldWorkCorrectly() {
         webTestClient.post()
                 .uri("/cart/items")
@@ -184,12 +199,12 @@ class CartControllerTest {
         verifyNoInteractions(orderService);
     }
 
-    // Additional test for reactive error handling
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateCartItem_WhenServiceReturnsError_ShouldHandleGracefully() {
         Long itemId = 1L;
 
-        when(cartService.increaseQuantityInCart(itemId, 0L))
+        when(cartService.increaseQuantityInCart(itemId, USER_ID))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         webTestClient.post()
@@ -199,6 +214,6 @@ class CartControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
     }
 }

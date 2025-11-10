@@ -33,7 +33,7 @@ class CartServiceTest {
     private CartPositionsRepository cartRepo;
 
     @MockitoBean
-    private org.yandex.payment.api.BalanceApi balanceApi;
+    private org.openapitools.client.api.BalanceApi balanceApi;
 
     @Autowired
     private CartService cartService;

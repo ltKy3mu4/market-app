@@ -139,3 +139,12 @@ components:
           type: string
         details:
           type: string
+
+  securitySchemes:
+    oauth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: http://localhost:8081/oauth/2/token
+          scopes:
+            payment: Get balance and make payment

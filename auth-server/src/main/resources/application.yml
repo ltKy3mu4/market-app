@@ -1,0 +1,24 @@
+logging:
+  level:
+    org.springframework.security: trace
+
+server:
+  port: 8081
+
+spring:
+  security:
+    oauth2:
+      authorizationserver:
+        client:
+          shop-client:
+            registration:
+              client-name: shop-client
+              client-id: shop-client
+              client-secret: "{noop}${SHOP_OAUTH_SECRET:shop-secret}"
+
+              client-authentication-methods:
+                - client_secret_basic
+              authorization-grant-types:
+                - client_credentials
+              scopes:
+                - payment
