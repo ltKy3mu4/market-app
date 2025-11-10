@@ -10,6 +10,11 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.client.AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.SessionLimit;
 import org.springframework.security.web.server.authentication.logout.HttpStatusReturningServerLogoutSuccessHandler;
@@ -24,11 +29,7 @@ import java.nio.file.AccessDeniedException;
 public class SecurityConfig {
 
     @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(
-            ServerHttpSecurity http,
-            ReactiveAuthenticationManager authenticationManager
-//            GlobalExceptionHandler globalExceptionHandler
-    ) {
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http, ReactiveAuthenticationManager authenticationManager) {
         return http
                 .authenticationManager(authenticationManager)
                 .authorizeExchange(exchanges -> exchanges
@@ -56,40 +57,6 @@ public class SecurityConfig {
     }
 
 
-//    @Bean
-//    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
-//        return http
-//                .authorizeExchange(exchanges -> exchanges
-//                        .pathMatchers("/", "/items/**").permitAll()
-//                        .anyExchange().authenticated()
-//                )
-//                .oauth2Login(Customizer.withDefaults())
-//                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-//                .build();
-//    }
-
-//    @Bean
-//    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
-//        return http
-//                .authorizeExchange(exchanges -> exchanges
-//                        .pathMatchers("/items/", "/items/**", "/").permitAll()
-//                        .pathMatchers("/admin").hasRole("ADMIN")
-//                        .anyExchange().authenticated()
-//                )
-//                /* Вход через OAuth 2.0 провайдеров
-// .oauth2Login()
-//*/
-//                .formLogin(Customizer.withDefaults())
-//                .logout(logout -> logout.logoutUrl("/"))
-//                .exceptionHandling(handling -> handling
-//                        .accessDeniedHandler((exchange, denied) ->
-//                                Mono.error(new AccessDeniedException("Access Denied")))
-//                )
-//                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-//                .cors(ServerHttpSecurity.CorsSpec::disable)
-//                .build();
-//    }
-
     @Bean
     public ReactiveAuthenticationManager reactiveAuthenticationManager(ReactiveUserDetailsService reactiveUserDetailsService) {
         var manager = new UserDetailsRepositoryReactiveAuthenticationManager(reactiveUserDetailsService);
@@ -97,4 +64,15 @@ public class SecurityConfig {
         return manager;
     }
 
+    @Bean
+    public ReactiveOAuth2AuthorizedClientManager authorizedClientManager(ReactiveClientRegistrationRepository clientRegistrationRepository, ReactiveOAuth2AuthorizedClientService authorizedClientService) {
+        var manager = new AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager(clientRegistrationRepository, authorizedClientService);
+
+        manager.setAuthorizedClientProvider(ReactiveOAuth2AuthorizedClientProviderBuilder.builder()
+                .clientCredentials()
+                .build()
+        );
+
+        return manager;
+    }
 }

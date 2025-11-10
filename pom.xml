@@ -23,6 +23,7 @@
         <module>api-spec</module>
         <module>shop</module>
         <module>payment-service</module>
+        <module>auth-server</module>
     </modules>
 
     <build>

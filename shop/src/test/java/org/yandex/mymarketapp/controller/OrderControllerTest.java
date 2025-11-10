@@ -3,6 +3,7 @@ package org.yandex.mymarketapp.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.yandex.mymarketapp.model.dto.ItemDto;
@@ -19,8 +20,7 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-@WebFluxTest(OrderController.class)
-class OrderControllerTest {
+class OrderControllerTest extends BaseControllerTest{
 
     @Autowired
     private WebTestClient webTestClient;
@@ -29,6 +29,7 @@ class OrderControllerTest {
     private OrderService orderService;
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrders_ShouldReturnOrdersViewWithOrdersList() {
         List<OrderDto> mockOrders = Arrays.asList(
                 new OrderDto(1L, Arrays.asList(
@@ -40,7 +41,7 @@ class OrderControllerTest {
                 ), 75.0)
         );
 
-        when(orderService.getAllOrders(0L)).thenReturn(Mono.just(new OrdersDto(mockOrders)));
+        when(orderService.getAllOrders(USER_ID)).thenReturn(Mono.just(new OrdersDto(mockOrders)));
 
         webTestClient.get()
                 .uri("/orders")
@@ -52,22 +53,24 @@ class OrderControllerTest {
                     // We can verify the service was called and response is successful
                 });
 
-        verify(orderService).getAllOrders(0L);
+        verify(orderService).getAllOrders(USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrders_WhenNoOrdersExist_ShouldReturnEmptyList() {
-        when(orderService.getAllOrders(0L)).thenReturn(Mono.just(new OrdersDto(List.of())));
+        when(orderService.getAllOrders(USER_ID)).thenReturn(Mono.just(new OrdersDto(List.of())));
 
         webTestClient.get()
                 .uri("/orders")
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getAllOrders(0L);
+        verify(orderService).getAllOrders(USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrderDetails_WithValidId_ShouldReturnOrderViewWithOrder() {
         Long orderId = 1L;
         OrderDto mockOrder = new OrderDto(orderId, Arrays.asList(
@@ -75,20 +78,21 @@ class OrderControllerTest {
                 new ItemDto(2L, "Item 2", "Description 2", "/img2.jpg", 25.0, 2)
         ), 150.0);
 
-        when(orderService.getOrderById(orderId, 0L)).thenReturn(Mono.just(mockOrder));
+        when(orderService.getOrderById(orderId, USER_ID)).thenReturn(Mono.just(mockOrder));
 
         webTestClient.get()
                 .uri("/orders/{id}", orderId)
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getOrderById(orderId, 0L);
+        verify(orderService).getOrderById(orderId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrderDetails_WithNonExistentId_ShouldThrowException() {
         Long nonExistentOrderId = 999L;
-        when(orderService.getOrderById(nonExistentOrderId, 0L))
+        when(orderService.getOrderById(nonExistentOrderId, USER_ID))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + nonExistentOrderId)));
 
         webTestClient.get()
@@ -96,10 +100,11 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(nonExistentOrderId, 0L);
+        verify(orderService).getOrderById(nonExistentOrderId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrderDetails_WithMultipleIds_ShouldReturnCorrectOrder() {
         Long orderId1 = 1L;
         Long orderId2 = 2L;
@@ -111,8 +116,8 @@ class OrderControllerTest {
                 new ItemDto(2L, "Item B", "Desc B", "/imgB.jpg", 100.0, 2)
         ), 200.0);
 
-        when(orderService.getOrderById(orderId1, 0L)).thenReturn(Mono.just(mockOrder1));
-        when(orderService.getOrderById(orderId2, 0L)).thenReturn(Mono.just(mockOrder2));
+        when(orderService.getOrderById(orderId1, USER_ID)).thenReturn(Mono.just(mockOrder1));
+        when(orderService.getOrderById(orderId2, USER_ID)).thenReturn(Mono.just(mockOrder2));
 
         // Test first order
         webTestClient.get()
@@ -126,14 +131,15 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(orderService).getOrderById(orderId1, 0L);
-        verify(orderService).getOrderById(orderId2, 0L);
+        verify(orderService).getOrderById(orderId1, USER_ID);
+        verify(orderService).getOrderById(orderId2, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrderDetails_WithZeroId_ShouldThrowException() {
-        Long zeroId = 0L;
-        when(orderService.getOrderById(zeroId, 0L))
+        Long zeroId = USER_ID;
+        when(orderService.getOrderById(zeroId, USER_ID))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + zeroId)));
 
         webTestClient.get()
@@ -141,13 +147,14 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(zeroId, 0L);
+        verify(orderService).getOrderById(zeroId, USER_ID);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrderDetails_WithNegativeId_ShouldThrowException() {
         Long negativeId = -1L;
-        when(orderService.getOrderById(negativeId, 0L))
+        when(orderService.getOrderById(negativeId, USER_ID))
                 .thenReturn(Mono.error(new OrderNotFoundException("Order not found with id: " + negativeId)));
 
         webTestClient.get()
@@ -155,13 +162,14 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).getOrderById(negativeId, 0L);
+        verify(orderService).getOrderById(negativeId, USER_ID);
     }
 
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showOrders_WhenServiceReturnsError_ShouldHandleGracefully() {
-        when(orderService.getAllOrders(0L))
+        when(orderService.getAllOrders(USER_ID))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         webTestClient.get()
@@ -169,7 +177,7 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(orderService).getAllOrders(0L);
+        verify(orderService).getAllOrders(USER_ID);
     }
 
 }

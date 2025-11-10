@@ -11,15 +11,14 @@ import org.yandex.mymarketapp.model.domain.User;
 import org.yandex.mymarketapp.model.dto.BalanceDto;
 import reactor.core.publisher.Mono;
 
-import org.yandex.payment.api.BalanceApi;
-import org.yandex.payment.api.PaymentsApi;
+
 
 @RestController
 @RequiredArgsConstructor
 @Slf4j
 public class BalanceController {
 
-    private final BalanceApi balanceApi;
+    private final org.openapitools.client.api.BalanceApi balanceApi;
 
     @PreAuthorize("hasAnyRole('USER')")
     @GetMapping("/balance")

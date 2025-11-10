@@ -27,7 +27,7 @@ public class CartService {
     private final ItemRepository itemsRepo;
     private final CartPositionsRepository cartRepo;
     private final ItemMapper itemMapper;
-    private final org.yandex.payment.api.BalanceApi balanceApi;
+    private final org.openapitools.client.api.BalanceApi balanceApi;
 
     @Transactional
     @CacheEvict(value = {"cart_items"}, key = "#userId")

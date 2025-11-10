@@ -29,7 +29,7 @@ public class OrderService {
     private final OrderRepository orderRepo;
     private final CartPositionsRepository cartRepo;
     private final OrderMapper orderMapper;
-    private final org.yandex.payment.api.PaymentsApi payApi;
+    private final org.openapitools.client.api.PaymentsApi payApi;
 
     @Transactional
     @CacheEvict(value = "orders", key = "#userId")

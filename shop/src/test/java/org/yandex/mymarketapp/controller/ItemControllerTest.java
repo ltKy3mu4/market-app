@@ -3,6 +3,7 @@ package org.yandex.mymarketapp.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.yandex.mymarketapp.model.domain.Item;
@@ -14,11 +15,7 @@ import reactor.core.publisher.Mono;
 
 import static org.mockito.Mockito.*;
 
-@WebFluxTest(ItemController.class)
-class ItemControllerTest {
-
-    @Autowired
-    private WebTestClient webTestClient;
+class ItemControllerTest extends BaseControllerTest{
 
     @MockitoBean
     private ItemService itemService;
@@ -27,9 +24,10 @@ class ItemControllerTest {
     private CartService cartService;
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showItem_ShouldReturnItemViewWithItemData() {
         Long itemId = 1L;
-        Long userId = 0L;
+        Long userId = USER_ID;
         Item mockItem = new Item(itemId, "Test Item", "Test Description", "/test.jpg", 25.99);
 
         when(itemService.getItemById(itemId)).thenReturn(Mono.just(mockItem));
@@ -46,9 +44,10 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void showItem_WhenItemNotFound_ShouldReturnNotFound() {
         Long itemId = 999L;
-        Long userId = 0L;
+        Long userId = USER_ID;
 
         when(itemService.getItemById(itemId))
                 .thenReturn(Mono.error(new ItemNotFoundException("Item not found with id: " + itemId)));
@@ -64,10 +63,11 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithPlusAction_ShouldIncreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -79,15 +79,16 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithMinusAction_ShouldDecreaseQuantityAndRedirect() {
         // Given
         Long itemId = 1L;
-        when(cartService.decreaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.decreaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // When & Then
         webTestClient.post()
@@ -99,11 +100,12 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).decreaseQuantityInCart(itemId, 0L);
+        verify(cartService).decreaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithInvalidAction_ShouldRedirectWithoutServiceCall() {
         // Given
         Long itemId = 1L;
@@ -123,6 +125,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithMissingAction_ShouldRedirect() {
         Long itemId = 1L;
 
@@ -137,6 +140,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithCaseSensitiveActions_ShouldWorkCorrectly() {
         Long itemId = 1L;
 
@@ -154,6 +158,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithEmptyAction_ShouldRedirect() {
         // Given
         Long itemId = 1L;
@@ -173,10 +178,11 @@ class ItemControllerTest {
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithPlusActionWhenServiceFails_ShouldPropagateError() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L))
+        when(cartService.increaseQuantityInCart(itemId, USER_ID))
                 .thenReturn(Mono.error(new RuntimeException("Service error")));
 
         // When & Then
@@ -188,15 +194,16 @@ class ItemControllerTest {
                 .exchange()
                 .expectStatus().is5xxServerError();
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
     @Test
+    @WithUserDetails(value = USER_USERNAME, userDetailsServiceBeanName = "inMemoryUserDetailsService")
     void updateItemQuantity_WithFormData_ShouldWorkCorrectly() {
         // Given
         Long itemId = 1L;
-        when(cartService.increaseQuantityInCart(itemId, 0L)).thenReturn(Mono.empty());
+        when(cartService.increaseQuantityInCart(itemId, USER_ID)).thenReturn(Mono.empty());
 
         // When & Then - Using form data instead of query param
         webTestClient.post()
@@ -207,7 +214,7 @@ class ItemControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().valueEquals("Location", "/items/" + itemId);
 
-        verify(cartService).increaseQuantityInCart(itemId, 0L);
+        verify(cartService).increaseQuantityInCart(itemId, USER_ID);
         verifyNoInteractions(itemService);
     }
 
